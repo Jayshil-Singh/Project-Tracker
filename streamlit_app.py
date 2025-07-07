@@ -30,7 +30,7 @@ reports = ReportGenerator()
 # Page configuration
 st.set_page_config(
     page_title="ProjectOps Assistant",
-    page_icon="🚀",
+    page_icon=":rocket:",
     layout="wide",
     initial_sidebar_state="expanded"
 )

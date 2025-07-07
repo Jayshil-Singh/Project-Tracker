@@ -35,7 +35,7 @@ class NeonAuth:
             st.warning("⚠️ Neon Auth not configured. Using local authentication.")
     
     def _create_auth_tables(self):
-        """Create authentication-related tables"""
+        """Create authentication-related tables and add user_id columns if needed"""
         try:
             with self.db.engine.connect() as conn:
                 # Users table
@@ -79,20 +79,13 @@ class NeonAuth:
                     )
                 """))
                 
-                # Add user_id to existing tables for multi-tenancy
-                conn.execute(text("""
-                    ALTER TABLE projects ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
-                """))
-                conn.execute(text("""
-                    ALTER TABLE meetings ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
-                """))
-                conn.execute(text("""
-                    ALTER TABLE client_updates ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
-                """))
-                conn.execute(text("""
-                    ALTER TABLE issues ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id)
-                """))
-                
+                # Add user_id to existing tables for multi-tenancy (cross-db compatible)
+                for table in ["projects", "meetings", "client_updates", "issues"]:
+                    # Check if user_id column exists
+                    col_check = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+                    col_names = [col[1] for col in col_check]
+                    if "user_id" not in col_names:
+                        conn.execute(text(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER"))
                 conn.commit()
         except Exception as e:
             st.error(f"Error creating auth tables: {e}")
