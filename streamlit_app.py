@@ -280,7 +280,7 @@ if menu == "📊 Dashboard":
 elif menu == "📁 Project Tracker":
     st.markdown('<h1 class="main-header">Project Tracker</h1>', unsafe_allow_html=True)
     
-    tab1, tab2 = st.tabs(["➕ Add New Project", "📋 All Projects"])
+    tab1, tab2, tab3 = st.tabs(["➕ Add New Project", "📋 All Projects", "📁 File Management"])
     
     with tab1:
         with st.expander("Add New Project", expanded=True):
@@ -300,17 +300,80 @@ elif menu == "📁 Project Tracker":
                 
                 description = st.text_area("Description", placeholder="Enter project description")
                 
+                # File upload section
+                from file_uploader import render_file_upload_section
+                file_path = render_file_upload_section(project_name, client_name)
+                
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col2:
                     submitted = st.form_submit_button("➕ Add Project", use_container_width=True)
                 
                 if submitted:
-                    db.add_project(
+                    success = db.add_project(
                         project_name, client_name, software, vendor,
                         start_date.strftime('%Y-%m-%d'), deadline.strftime('%Y-%m-%d'),
-                        status, description, None  # No file path in cloud
+                        status, description, file_path
                     )
-                    st.success(f"✅ Project '{project_name}' added successfully!")
+                    if success:
+                        st.success(f"✅ Project '{project_name}' added successfully!")
+                    else:
+                        st.error("❌ Failed to add project. Please try again.")
+    
+    with tab2:
+        projects = db.get_all_projects()
+        if not projects.empty:
+            # Filters
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()))
+            with col2:
+                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()))
+            with col3:
+                search_term = st.text_input("Search Projects", placeholder="Search by name or client")
+            
+            # Apply filters
+            filtered_projects = projects.copy()
+            if status_filter != "All":
+                filtered_projects = filtered_projects[filtered_projects['status'] == status_filter]
+            if software_filter != "All":
+                filtered_projects = filtered_projects[filtered_projects['software'] == software_filter]
+            if search_term:
+                filtered_projects = filtered_projects[
+                    filtered_projects['project_name'].str.contains(search_term, case=False) |
+                    filtered_projects['client_name'].str.contains(search_term, case=False)
+                ]
+            
+            # Display filtered results
+            st.dataframe(filtered_projects, use_container_width=True)
+            
+            # Export options
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("📊 Export to PDF", use_container_width=True):
+                    filename = reports.export_projects_to_pdf(filtered_projects, "projects_report.pdf")
+                    with open(filename, "rb") as f:
+                        st.download_button("📥 Download PDF", f, file_name="projects_report.pdf", use_container_width=True)
+            with col2:
+                if st.button("📈 Export to Excel", use_container_width=True):
+                    filename = reports.export_to_excel(filtered_projects, "projects_report.xlsx")
+                    with open(filename, "rb") as f:
+                        st.download_button("📥 Download Excel", f, file_name="projects_report.xlsx", use_container_width=True)
+        else:
+            st.info("No projects found")
+    
+    with tab3:
+        from file_uploader import render_bulk_file_upload, render_file_analytics
+        
+        # File management options
+        file_option = st.selectbox(
+            "File Management Options",
+            ["📦 Bulk File Upload", "📊 File Analytics"]
+        )
+        
+        if file_option == "📦 Bulk File Upload":
+            render_bulk_file_upload()
+        elif file_option == "📊 File Analytics":
+            render_file_analytics()
     
     with tab2:
         projects = db.get_all_projects()
