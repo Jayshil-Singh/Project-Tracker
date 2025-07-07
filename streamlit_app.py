@@ -428,55 +428,35 @@ elif menu == "📁 Project Tracker":
                     filtered_projects['client_name'].str.contains(search_term, case=False)
                 ]
             st.subheader(f"📋 Projects ({len(filtered_projects)} found)")
+            seen_ids = set()
             for idx, project in filtered_projects.iterrows():
-                with st.container():
-                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                    with col1:
-                        st.markdown(f"**{project['project_name']}**")
-                        st.markdown(f"*{project['client_name']} - {project['software']}*")
-                    with col2:
-                        st.markdown(f"**Status:** {project['status']}")
-                        st.markdown(f"**Vendor:** {project['vendor']}")
-                    with col3:
-                        st.markdown(f"**Start:** {project['start_date']}")
-                        st.markdown(f"**Deadline:** {project['deadline']}")
-                    with col4:
-                        if st.button("🗑️", key=f"delete_project_{project['id']}", help="Delete project"):
-                            if st.session_state.get(f"confirm_delete_{project['id']}", False):
-                                if db.delete_project(project['id']):
-                                    st.success(f"✅ Project '{project['project_name']}' deleted successfully!")
-                                    st.rerun()
-                                else:
-                                    st.error("❌ Failed to delete project")
-                            else:
-                                st.session_state[f"confirm_delete_{project['id']}"] = True
-                                st.warning(f"⚠️ Click again to confirm deletion of '{project['project_name']}'")
-                                st.rerun()
-                    # Defensive check for project_name and id
-                    pname = project.get('project_name')
-                    pid = project.get('id')
-                    if (
-                        pd.notnull(pname) and
-                        pd.notnull(pid) and
-                        isinstance(pname, str) and
-                        str(pname).strip() and
-                        str(pid).strip()
-                    ):
-                        with st.expander(f"📄 View Details - {pname}", key=f"details_{str(pid)}"):
-                            st.markdown(f"**Description:** {project['description']}")
-                            if project['file_path']:
-                                st.markdown(f"**File:** {project['file_path']}")
-                            col1d, col2d, col3d = st.columns(3)
-                            with col1d:
-                                project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
-                                st.markdown(f"**Meetings:** {len(project_meetings)}")
-                            with col2d:
-                                project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
-                                st.markdown(f"**Updates:** {len(project_updates)}")
-                            with col3d:
-                                project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
-                                st.markdown(f"**Issues:** {len(project_issues)}")
-                    st.divider()
+                pname = project.get('project_name')
+                pid = project.get('id')
+                # Defensive checks and skip duplicates
+                if (
+                    pd.notnull(pname) and
+                    pd.notnull(pid) and
+                    isinstance(pname, str) and
+                    str(pname).strip() and
+                    str(pid).strip() and
+                    pid not in seen_ids
+                ):
+                    seen_ids.add(pid)
+                    with st.expander(f"📄 View Details - {pname}", key=f"details_{str(pid)}"):
+                        st.markdown(f"**Description:** {project['description']}")
+                        if project['file_path']:
+                            st.markdown(f"**File:** {project['file_path']}")
+                        col1d, col2d, col3d = st.columns(3)
+                        with col1d:
+                            project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
+                            st.markdown(f"**Meetings:** {len(project_meetings)}")
+                        with col2d:
+                            project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
+                            st.markdown(f"**Updates:** {len(project_updates)}")
+                        with col3d:
+                            project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
+                            st.markdown(f"**Issues:** {len(project_issues)}")
+                st.divider()
             col1e, col2e = st.columns(2)
             with col1e:
                 if st.button("📊 Export to PDF", key="projects_export_pdf", use_container_width=True):
