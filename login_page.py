@@ -121,13 +121,7 @@ def render_login_form():
     with st.form("login_form", clear_on_submit=True):
         email = st.text_input("📧 Email", placeholder="Enter your email", key="login_email")
         password = st.text_input("🔒 Password", type="password", placeholder="Enter your password", key="login_password")
-        
-        col1, col2 = st.columns([1, 1])
-        with col1:
-            remember_me = st.checkbox("Remember me", key="remember_me")
-        with col2:
-            forgot_password = st.button("Forgot Password?", key="forgot_password_btn")
-        
+        remember_me = st.checkbox("Remember me", key="remember_me")
         submitted = st.form_submit_button("🚀 Sign In", use_container_width=True)
         
         if submitted:
@@ -143,6 +137,10 @@ def render_login_form():
                     st.rerun()
                 else:
                     st.error(f"❌ {result}")
+    # Forgot Password button outside the form
+    forgot_password = st.button("Forgot Password?", key="forgot_password_btn")
+    if forgot_password:
+        st.info("Password reset is not implemented yet.")
 
 def render_register_form():
     """Render the registration form"""
