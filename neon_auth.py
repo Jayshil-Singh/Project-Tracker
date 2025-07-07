@@ -319,9 +319,6 @@ class NeonAuth:
             smtp_pass = smtp_config.get("smtp_password")
             from_email = smtp_config.get("from_email", smtp_user)
 
-            st.write("smtp_host:", repr(smtp_host))
-            st.write("smtp_user:", repr(smtp_user))
-            st.write("smtp_pass:", repr(smtp_pass))
             if not (smtp_host and smtp_user and smtp_pass):
                 return False, "SMTP not configured."
             subject = "Your Project Tracker Account - Temporary Password"
@@ -335,7 +332,7 @@ Temporary Password: {temp_password}
 
 Please log in and set your own password as soon as possible.
 
-Login URL: [Your App URL Here]
+Login URL: https://ps-project-tracker.streamlit.app/
 
 If you did not expect this email, please ignore it.
 """
