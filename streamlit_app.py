@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from database import ProjectOpsDatabase
+from database_postgres import ProjectOpsDatabase
 from chatbot import ProjectOpsChatbot
 import reports
 import os
@@ -144,15 +144,14 @@ elif authentication_status is None:
 
 # --- END AUTHENTICATION ---
 
-# Cloud-compatible database path
-db_path = "projectops_cloud.db"
-
-# Initialize database with error handling
+# Initialize PostgreSQL database
 try:
-    db = ProjectOpsDatabase(db_path)
+    db = ProjectOpsDatabase()  # Will use st.secrets["DB_URL"] or fallback to SQLite
     chatbot = ProjectOpsChatbot(db)
+    st.success("✅ Connected to database successfully!")
 except Exception as e:
-    st.error(f"Database initialization error: {e}")
+    st.error(f"❌ Database connection failed: {e}")
+    st.info("💡 Make sure to configure your database URL in Streamlit Cloud secrets")
     st.stop()
 
 # Sidebar with professional styling
