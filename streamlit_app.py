@@ -408,6 +408,8 @@ elif menu == "📁 Project Tracker":
     # OUTSIDE the form: project table, delete/export buttons, etc.
     with tab2:
         projects = db.get_all_projects(current_user['id'])
+        meetings = db.get_all_meetings(current_user['id'])
+        issues = db.get_all_issues(current_user['id'])
         if not projects.empty:
             # Filters
             col1, col2, col3 = st.columns(3)
