@@ -1,2 +1,0 @@
-# System dependencies for ProjectOps Assistant
-# No additional system packages required for this deployment 
