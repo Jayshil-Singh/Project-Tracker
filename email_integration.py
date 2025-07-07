@@ -32,23 +32,34 @@ class OutlookEmailIntegration:
         self._load_config()
     
     def _load_config(self):
-        """Load Microsoft Graph API configuration from secrets"""
+        """Load Microsoft Graph API configuration from secrets or session state"""
         try:
-            secrets = st.secrets
-            self.client_id = secrets.get("MS_GRAPH_CLIENT_ID")
-            self.client_secret = secrets.get("MS_GRAPH_CLIENT_SECRET")
-            self.tenant_id = secrets.get("MS_GRAPH_TENANT_ID")
-            self.user_email = secrets.get("MS_GRAPH_USER_EMAIL")
-            
-            # Check if we have stored tokens
+            # First, check session state (set by the form)
+            config = st.session_state.get("email_config", {})
+            self.client_id = config.get("client_id")
+            self.client_secret = config.get("client_secret")
+            self.tenant_id = config.get("tenant_id")
+            self.user_email = config.get("user_email")
+
+            # If not set, fall back to secrets
+            if not self.client_id:
+                self.client_id = st.secrets.get("MS_GRAPH_CLIENT_ID")
+            if not self.client_secret:
+                self.client_secret = st.secrets.get("MS_GRAPH_CLIENT_SECRET")
+            if not self.tenant_id:
+                self.tenant_id = st.secrets.get("MS_GRAPH_TENANT_ID")
+            if not self.user_email:
+                self.user_email = st.secrets.get("MS_GRAPH_USER_EMAIL")
+
+            # Check for tokens
             if 'email_access_token' in st.session_state:
                 self.access_token = st.session_state.email_access_token
             if 'email_refresh_token' in st.session_state:
                 self.refresh_token = st.session_state.email_refresh_token
-                
+
             st.write("Client ID:", self.client_id)
             st.write("Tenant ID:", self.tenant_id)
-            
+
         except Exception as e:
             st.error(f"Error loading email configuration: {e}")
     
