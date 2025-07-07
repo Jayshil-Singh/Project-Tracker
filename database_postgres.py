@@ -270,4 +270,46 @@ class ProjectOpsDatabase:
                 return pd.DataFrame()
         except Exception as e:
             st.error(f"Error searching projects: {e}")
-            return pd.DataFrame() 
+            return pd.DataFrame()
+    
+    def delete_project(self, project_id):
+        """Delete a project and all related data"""
+        try:
+            with self.engine.connect() as conn:
+                # Delete related records first (foreign key constraints)
+                # Delete issues
+                delete_issues = text("DELETE FROM issues WHERE project_id = :project_id")
+                conn.execute(delete_issues, {'project_id': project_id})
+                
+                # Delete client updates
+                delete_updates = text("DELETE FROM client_updates WHERE project_id = :project_id")
+                conn.execute(delete_updates, {'project_id': project_id})
+                
+                # Delete meetings
+                delete_meetings = text("DELETE FROM meetings WHERE project_id = :project_id")
+                conn.execute(delete_meetings, {'project_id': project_id})
+                
+                # Delete the project
+                delete_project = text("DELETE FROM projects WHERE id = :project_id")
+                result = conn.execute(delete_project, {'project_id': project_id})
+                conn.commit()
+                
+                return result.rowcount > 0
+        except Exception as e:
+            st.error(f"Error deleting project: {e}")
+            return False
+    
+    def get_project_by_id(self, project_id):
+        """Get a specific project by ID"""
+        try:
+            query = text("SELECT * FROM projects WHERE id = :project_id")
+            with self.engine.connect() as conn:
+                result = conn.execute(query, {'project_id': project_id})
+                row = result.fetchone()
+                if row:
+                    columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path']
+                    return dict(zip(columns, row))
+                return None
+        except Exception as e:
+            st.error(f"Error getting project: {e}")
+            return None 

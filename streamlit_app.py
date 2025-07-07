@@ -288,36 +288,47 @@ elif menu == "📁 Project Tracker":
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    project_name = st.text_input("Project Name", placeholder="Enter project name")
-                    client_name = st.text_input("Client Name", placeholder="Enter client name")
-                    software = st.selectbox("Software", ["Epicor", "MYOB", "ODOO", "PayGlobal", "Other"])
-                    vendor = st.text_input("Vendor", placeholder="Enter vendor name")
+                    project_name = st.text_input("Project Name *", placeholder="Enter project name", key="project_name_input")
+                    client_name = st.text_input("Client Name *", placeholder="Enter client name", key="client_name_input")
+                    software = st.selectbox("Software *", ["Epicor", "MYOB", "ODOO", "PayGlobal", "Other"], key="software_select")
+                    vendor = st.text_input("Vendor *", placeholder="Enter vendor name", key="vendor_input")
                 
                 with col2:
-                    start_date = st.date_input("Start Date")
-                    deadline = st.date_input("Deadline")
-                    status = st.selectbox("Status", ["In Progress", "On Hold", "Completed"])
+                    start_date = st.date_input("Start Date *", key="start_date_input")
+                    deadline = st.date_input("Deadline *", key="deadline_input")
+                    status = st.selectbox("Status *", ["In Progress", "On Hold", "Completed"], key="status_select")
                 
-                description = st.text_area("Description", placeholder="Enter project description")
+                description = st.text_area("Description *", placeholder="Enter project description", key="description_input")
                 
                 # File upload section
                 from file_uploader import render_file_upload_section
                 file_path = render_file_upload_section(project_name, client_name)
+                
+                # Validation message
+                if not project_name or not client_name or not vendor or not description:
+                    st.warning("⚠️ Please fill in all required fields marked with *")
                 
                 col1, col2, col3 = st.columns([1, 1, 1])
                 with col2:
                     submitted = st.form_submit_button("➕ Add Project", use_container_width=True)
                 
                 if submitted:
-                    success = db.add_project(
-                        project_name, client_name, software, vendor,
-                        start_date.strftime('%Y-%m-%d'), deadline.strftime('%Y-%m-%d'),
-                        status, description, file_path
-                    )
-                    if success:
-                        st.success(f"✅ Project '{project_name}' added successfully!")
+                    # Validate all required fields
+                    if not project_name or not client_name or not vendor or not description:
+                        st.error("❌ Please fill in all required fields marked with *")
+                    elif start_date >= deadline:
+                        st.error("❌ Deadline must be after start date")
                     else:
-                        st.error("❌ Failed to add project. Please try again.")
+                        success = db.add_project(
+                            project_name, client_name, software, vendor,
+                            start_date.strftime('%Y-%m-%d'), deadline.strftime('%Y-%m-%d'),
+                            status, description, file_path
+                        )
+                        if success:
+                            st.success(f"✅ Project '{project_name}' added successfully!")
+                            st.rerun()  # Refresh the form
+                        else:
+                            st.error("❌ Failed to add project. Please try again.")
     
     with tab2:
         projects = db.get_all_projects()
@@ -343,18 +354,80 @@ elif menu == "📁 Project Tracker":
                     filtered_projects['client_name'].str.contains(search_term, case=False)
                 ]
             
-            # Display filtered results
-            st.dataframe(filtered_projects, use_container_width=True)
+            # Display filtered results with delete buttons
+            st.subheader(f"📋 Projects ({len(filtered_projects)} found)")
+            
+            for idx, project in filtered_projects.iterrows():
+                with st.container():
+                    col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
+                    
+                    with col1:
+                        st.markdown(f"**{project['project_name']}**")
+                        st.markdown(f"*{project['client_name']} - {project['software']}*")
+                    
+                    with col2:
+                        st.markdown(f"**Status:** {project['status']}")
+                        st.markdown(f"**Vendor:** {project['vendor']}")
+                    
+                    with col3:
+                        st.markdown(f"**Start:** {project['start_date']}")
+                        st.markdown(f"**Deadline:** {project['deadline']}")
+                    
+                    with col4:
+                        # Delete button
+                        if st.button("🗑️", key=f"delete_project_{project['id']}", help="Delete project"):
+                            if st.session_state.get(f"confirm_delete_{project['id']}", False):
+                                # Second confirmation
+                                if db.delete_project(project['id']):
+                                    st.success(f"✅ Project '{project['project_name']}' deleted successfully!")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ Failed to delete project")
+                            else:
+                                # First confirmation
+                                st.session_state[f"confirm_delete_{project['id']}"] = True
+                                st.warning(f"⚠️ Click again to confirm deletion of '{project['project_name']}'")
+                                st.rerun()
+                    
+                    # Show project details in expander
+                    with st.expander(f"📄 View Details - {project['project_name']}", key=f"details_{project['id']}"):
+                        st.markdown(f"**Description:** {project['description']}")
+                        if project['file_path']:
+                            st.markdown(f"**File:** {project['file_path']}")
+                        
+                        # Show related data
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            meetings = db.get_all_meetings()
+                            project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
+                            st.markdown(f"**Meetings:** {len(project_meetings)}")
+                        
+                        with col2:
+                            updates = pd.DataFrame()
+                            if not projects.empty:
+                                updates = pd.concat([
+                                    db.get_client_updates_by_project(pid) for pid in projects['id'].tolist()
+                                ], ignore_index=True)
+                            project_updates = updates[updates['project_id'] == project['id']] if not updates.empty else pd.DataFrame()
+                            st.markdown(f"**Updates:** {len(project_updates)}")
+                        
+                        with col3:
+                            issues = db.get_all_issues()
+                            project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
+                            st.markdown(f"**Issues:** {len(project_issues)}")
+                    
+                    st.divider()
             
             # Export options
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("📊 Export to PDF", use_container_width=True):
+                if st.button("📊 Export to PDF", key="projects_export_pdf", use_container_width=True):
                     filename = reports.export_projects_to_pdf(filtered_projects, "projects_report.pdf")
                     with open(filename, "rb") as f:
                         st.download_button("📥 Download PDF", f, file_name="projects_report.pdf", use_container_width=True)
             with col2:
-                if st.button("📈 Export to Excel", use_container_width=True):
+                if st.button("📈 Export to Excel", key="projects_export_excel", use_container_width=True):
                     filename = reports.export_to_excel(filtered_projects, "projects_report.xlsx")
                     with open(filename, "rb") as f:
                         st.download_button("📥 Download Excel", f, file_name="projects_report.xlsx", use_container_width=True)
@@ -375,48 +448,6 @@ elif menu == "📁 Project Tracker":
             render_bulk_file_upload()
         elif file_option == "📊 File Analytics":
             render_file_analytics()
-    
-    with tab2:
-        projects = db.get_all_projects()
-        if not projects.empty:
-            # Filters
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()), key="status_filter_projects")
-            with col2:
-                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()), key="software_filter_projects")
-            with col3:
-                search_term = st.text_input("Search Projects", placeholder="Search by name or client", key="search_projects")
-            
-            # Apply filters
-            filtered_projects = projects.copy()
-            if status_filter != "All":
-                filtered_projects = filtered_projects[filtered_projects['status'] == status_filter]
-            if software_filter != "All":
-                filtered_projects = filtered_projects[filtered_projects['software'] == software_filter]
-            if search_term:
-                filtered_projects = filtered_projects[
-                    filtered_projects['project_name'].str.contains(search_term, case=False) |
-                    filtered_projects['client_name'].str.contains(search_term, case=False)
-                ]
-            
-            # Display filtered results
-            st.dataframe(filtered_projects, use_container_width=True)
-            
-            # Export options
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("📊 Export to PDF", use_container_width=True):
-                    filename = reports.export_projects_to_pdf(filtered_projects, "projects_report.pdf")
-                    with open(filename, "rb") as f:
-                        st.download_button("📥 Download PDF", f, file_name="projects_report.pdf", use_container_width=True)
-            with col2:
-                if st.button("📈 Export to Excel", use_container_width=True):
-                    filename = reports.export_to_excel(filtered_projects, "projects_report.xlsx")
-                    with open(filename, "rb") as f:
-                        st.download_button("📥 Download Excel", f, file_name="projects_report.xlsx", use_container_width=True)
-        else:
-            st.info("No projects found")
 
 elif menu == "🗓️ Meeting & MoM Log":
     st.markdown('<h1 class="main-header">Meeting & MoM Log</h1>', unsafe_allow_html=True)
@@ -432,16 +463,16 @@ elif menu == "🗓️ Meeting & MoM Log":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    project_name = st.selectbox("Project", list(project_dict.keys()))
-                    meeting_date = st.date_input("Date")
-                    attendees = st.text_input("Attendees", placeholder="Enter attendee names")
+                    project_name = st.selectbox("Project", list(project_dict.keys()), key="meeting_project_select")
+                    meeting_date = st.date_input("Date", key="meeting_date_input")
+                    attendees = st.text_input("Attendees", placeholder="Enter attendee names", key="meeting_attendees_input")
                 
                 with col2:
-                    agenda = st.text_input("Agenda", placeholder="Enter meeting agenda")
-                    follow_up_date = st.date_input("Follow-up Date")
+                    agenda = st.text_input("Agenda", placeholder="Enter meeting agenda", key="meeting_agenda_input")
+                    follow_up_date = st.date_input("Follow-up Date", key="meeting_followup_input")
                 
-                mom = st.text_area("Minutes of Meeting (MoM)", placeholder="Enter meeting minutes")
-                next_steps = st.text_area("Next Steps", placeholder="Enter next steps")
+                mom = st.text_area("Minutes of Meeting (MoM)", placeholder="Enter meeting minutes", key="meeting_mom_input")
+                next_steps = st.text_area("Next Steps", placeholder="Enter next steps", key="meeting_next_steps_input")
                 
                 submitted = st.form_submit_button("📝 Log Meeting", use_container_width=True)
                 
@@ -453,6 +484,7 @@ elif menu == "🗓️ Meeting & MoM Log":
                         follow_up_date.strftime('%Y-%m-%d')
                     )
                     st.success(f"✅ Meeting for '{project_name}' logged successfully!")
+                    st.rerun()
     
     with tab2:
         meetings = db.get_all_meetings()
@@ -488,16 +520,16 @@ elif menu == "🧾 Client Update Log":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    project_name = st.selectbox("Project", list(project_dict.keys()))
-                    update_date = st.date_input("Date")
-                    sent_by = st.text_input("Sent By", placeholder="Enter sender name")
+                    project_name = st.selectbox("Project", list(project_dict.keys()), key="update_project_select")
+                    update_date = st.date_input("Date", key="update_date_input")
+                    sent_by = st.text_input("Sent By", placeholder="Enter sender name", key="update_sent_by_input")
                 
                 with col2:
-                    mode = st.selectbox("Mode", ["Email", "Call", "Meeting", "Other"])
+                    mode = st.selectbox("Mode", ["Email", "Call", "Meeting", "Other"], key="update_mode_select")
                 
-                summary = st.text_area("Summary", placeholder="Enter update summary")
-                client_feedback = st.text_area("Client Feedback", placeholder="Enter client feedback")
-                next_step = st.text_area("Next Step", placeholder="Enter next step")
+                summary = st.text_area("Summary", placeholder="Enter update summary", key="update_summary_input")
+                client_feedback = st.text_area("Client Feedback", placeholder="Enter client feedback", key="update_feedback_input")
+                next_step = st.text_area("Next Step", placeholder="Enter next step", key="update_next_step_input")
                 
                 submitted = st.form_submit_button("📧 Log Update", use_container_width=True)
                 
@@ -508,6 +540,7 @@ elif menu == "🧾 Client Update Log":
                         summary, sent_by, mode, client_feedback, next_step
                     )
                     st.success(f"✅ Update for '{project_name}' logged successfully!")
+                    st.rerun()
     
     with tab2:
         updates = pd.DataFrame()
@@ -548,15 +581,15 @@ elif menu == "🛠️ Issue Tracker":
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    project_name = st.selectbox("Project", list(project_dict.keys()))
-                    date_reported = st.date_input("Date Reported")
-                    status = st.selectbox("Status", ["Pending", "Resolved"])
+                    project_name = st.selectbox("Project", list(project_dict.keys()), key="issue_project_select")
+                    date_reported = st.date_input("Date Reported", key="issue_date_reported_input")
+                    status = st.selectbox("Status", ["Pending", "Resolved"], key="issue_status_select")
                 
                 with col2:
-                    assigned_to = st.text_input("Assigned To", placeholder="Enter assignee name")
-                    resolution_date = st.date_input("Resolution Date", value=datetime.today())
+                    assigned_to = st.text_input("Assigned To", placeholder="Enter assignee name", key="issue_assigned_to_input")
+                    resolution_date = st.date_input("Resolution Date", value=datetime.today(), key="issue_resolution_date_input")
                 
-                issue_description = st.text_area("Issue Description", placeholder="Enter detailed issue description")
+                issue_description = st.text_area("Issue Description", placeholder="Enter detailed issue description", key="issue_description_input")
                 
                 submitted = st.form_submit_button("🚨 Log Issue", use_container_width=True)
                 
@@ -568,6 +601,7 @@ elif menu == "🛠️ Issue Tracker":
                         resolution_date.strftime('%Y-%m-%d') if status == "Resolved" else None
                     )
                     st.success(f"✅ Issue for '{project_name}' logged successfully!")
+                    st.rerun()
     
     with tab2:
         issues = db.get_all_issues()
@@ -625,22 +659,22 @@ elif menu == "🤖 AI Chatbot":
     with col2:
         st.markdown("### 🎯 Quick Actions")
         
-        if st.button("📊 Show All Projects", use_container_width=True):
+        if st.button("📊 Show All Projects", key="chat_show_projects", use_container_width=True):
             response = chatbot.process_query("Show all projects")
             st.session_state['chat_history'].append(("Show all projects", response))
             st.rerun()
         
-        if st.button("📅 Recent Meetings", use_container_width=True):
+        if st.button("📅 Recent Meetings", key="chat_recent_meetings", use_container_width=True):
             response = chatbot.process_query("Show last meetings")
             st.session_state['chat_history'].append(("Show last meetings", response))
             st.rerun()
         
-        if st.button("🚨 Pending Issues", use_container_width=True):
+        if st.button("🚨 Pending Issues", key="chat_pending_issues", use_container_width=True):
             response = chatbot.process_query("What issues are unresolved?")
             st.session_state['chat_history'].append(("What issues are unresolved?", response))
             st.rerun()
         
-        if st.button("📧 Latest Updates", use_container_width=True):
+        if st.button("📧 Latest Updates", key="chat_latest_updates", use_container_width=True):
             response = chatbot.process_query("Show recent client updates")
             st.session_state['chat_history'].append(("Show recent client updates", response))
             st.rerun()
@@ -654,7 +688,7 @@ elif menu == "🤖 AI Chatbot":
         - "Show client updates for ATH"
         """)
         
-        if st.button("🆘 Show Help", use_container_width=True):
+        if st.button("🆘 Show Help", key="chat_show_help", use_container_width=True):
             help_msg = chatbot._get_help_message()
             st.session_state['chat_history'].append(("Show help", help_msg))
             st.rerun()
