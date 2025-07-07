@@ -14,6 +14,10 @@ import os
 import pandas as pd
 from sqlalchemy import text
 from database_postgres import ProjectOpsDatabase
+import random
+import string
+import smtplib
+from email.mime.text import MIMEText
 
 class NeonAuth:
     def __init__(self):
@@ -44,7 +48,22 @@ class NeonAuth:
                         role VARCHAR(50) DEFAULT 'user',
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         last_login TIMESTAMP,
-                        is_active BOOLEAN DEFAULT TRUE
+                        is_active BOOLEAN DEFAULT TRUE,
+                        must_change_password BOOLEAN DEFAULT FALSE
+                    )
+                """))
+                
+                # Audit logs table
+                conn.execute(text("""
+                    CREATE TABLE IF NOT EXISTS audit_logs (
+                        id SERIAL PRIMARY KEY,
+                        admin_id INTEGER,
+                        admin_email VARCHAR(255),
+                        action VARCHAR(100),
+                        target_user_id INTEGER,
+                        target_email VARCHAR(255),
+                        details TEXT,
+                        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     )
                 """))
                 
@@ -86,33 +105,29 @@ class NeonAuth:
         """Generate a secure session token"""
         return secrets.token_urlsafe(32)
     
-    def register_user(self, email, password, full_name):
-        """Register a new user"""
+    def register_user(self, email, password, full_name, role='user'):
+        """Admin-only registration"""
         try:
             with self.db.engine.connect() as conn:
                 # Check if user already exists
                 check_query = text("SELECT id FROM users WHERE email = :email")
                 existing_user = conn.execute(check_query, {'email': email}).fetchone()
-                
                 if existing_user:
                     return False, "User already exists"
-                
-                # Hash password and create user
                 password_hash = self._hash_password(password)
                 insert_query = text("""
-                    INSERT INTO users (email, password_hash, full_name)
-                    VALUES (:email, :password_hash, :full_name)
+                    INSERT INTO users (email, password_hash, full_name, role, must_change_password)
+                    VALUES (:email, :password_hash, :full_name, :role, FALSE)
                     RETURNING id
                 """)
-                
                 result = conn.execute(insert_query, {
                     'email': email,
                     'password_hash': password_hash,
-                    'full_name': full_name
+                    'full_name': full_name,
+                    'role': role
                 })
                 user_id = result.fetchone()[0]
                 conn.commit()
-                
                 return True, f"User registered successfully with ID: {user_id}"
         except Exception as e:
             return False, f"Registration failed: {e}"
@@ -292,6 +307,248 @@ class NeonAuth:
         except Exception as e:
             st.error(f"Error getting user projects: {e}")
             return pd.DataFrame()
+
+    def send_temp_password_email(self, to_email, temp_password, full_name):
+        """Send temp password email if SMTP is configured in Streamlit secrets"""
+        try:
+            smtp_host = st.secrets.get("SMTP_HOST")
+            smtp_port = int(st.secrets.get("SMTP_PORT", 587))
+            smtp_user = st.secrets.get("SMTP_USER")
+            smtp_pass = st.secrets.get("SMTP_PASS")
+            from_email = st.secrets.get("SMTP_FROM", smtp_user)
+            if not (smtp_host and smtp_user and smtp_pass):
+                return False, "SMTP not configured."
+            subject = "Your Project Tracker Account - Temporary Password"
+            body = f"""
+Hello {full_name},
+
+Your Project Tracker account has been created.
+
+Login Email: {to_email}
+Temporary Password: {temp_password}
+
+Please log in and set your own password as soon as possible.
+
+Login URL: [Your App URL Here]
+
+If you did not expect this email, please ignore it.
+"""
+            msg = MIMEText(body)
+            msg['Subject'] = subject
+            msg['From'] = from_email
+            msg['To'] = to_email
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_email, [to_email], msg.as_string())
+            return True, "Email sent."
+        except Exception as e:
+            return False, f"Email error: {e}"
+
+    def create_user_with_temp_password(self, email, full_name, role='user'):
+        """Admin creates a user with a temp password. Returns (success, temp_password/message)"""
+        temp_password = self._generate_temp_password()
+        password_hash = self._hash_password(temp_password)
+        try:
+            with self.db.engine.connect() as conn:
+                # Check if user already exists
+                check_query = text("SELECT id FROM users WHERE email = :email")
+                existing_user = conn.execute(check_query, {'email': email}).fetchone()
+                if existing_user:
+                    return False, "User already exists"
+                insert_query = text("""
+                    INSERT INTO users (email, password_hash, full_name, role, must_change_password)
+                    VALUES (:email, :password_hash, :full_name, :role, TRUE)
+                    RETURNING id
+                """)
+                result = conn.execute(insert_query, {
+                    'email': email,
+                    'password_hash': password_hash,
+                    'full_name': full_name,
+                    'role': role
+                })
+                user_id = result.fetchone()[0]
+                conn.commit()
+                # Try to send email
+                email_sent, email_msg = self.send_temp_password_email(email, temp_password, full_name)
+                if email_sent:
+                    return True, f"Temporary password sent to {email}."
+                else:
+                    return True, f"User created. Email not sent: {email_msg}. Temporary password: {temp_password}"
+        except Exception as e:
+            return False, f"User creation failed: {e}"
+
+    def _generate_temp_password(self, length=10):
+        chars = string.ascii_letters + string.digits
+        return ''.join(random.choice(chars) for _ in range(length))
+
+    def set_user_password(self, user_id, new_password):
+        """Set a new password for a user and clear must_change_password flag"""
+        try:
+            with self.db.engine.connect() as conn:
+                password_hash = self._hash_password(new_password)
+                update_query = text("""
+                    UPDATE users SET password_hash = :password_hash, must_change_password = FALSE WHERE id = :user_id
+                """)
+                conn.execute(update_query, {'password_hash': password_hash, 'user_id': user_id})
+                conn.commit()
+                return True
+        except Exception as e:
+            st.error(f"Password update failed: {e}")
+            return False
+
+    def check_must_change_password(self, user_id):
+        """Check if user must change password on next login"""
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("SELECT must_change_password FROM users WHERE id = :user_id")
+                result = conn.execute(query, {'user_id': user_id}).fetchone()
+                if result and result[0]:
+                    return True
+                return False
+        except Exception as e:
+            st.error(f"Error checking must_change_password: {e}")
+            return False
+
+    def get_all_users(self):
+        """Return all users for admin listing"""
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("SELECT id, email, full_name, role, created_at, last_login, is_active FROM users ORDER BY created_at DESC")
+                result = conn.execute(query)
+                rows = result.fetchall()
+                if rows:
+                    columns = ['id', 'email', 'full_name', 'role', 'created_at', 'last_login', 'is_active']
+                    return pd.DataFrame(rows, columns=columns)
+                return pd.DataFrame()
+        except Exception as e:
+            st.error(f"Error getting users: {e}")
+            return pd.DataFrame()
+
+    def set_user_active(self, user_id, is_active, admin_id=None, admin_email=None):
+        """Set user active/inactive (deactivate/reactivate) and log action"""
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("UPDATE users SET is_active = :is_active WHERE id = :user_id")
+                conn.execute(query, {'is_active': is_active, 'user_id': user_id})
+                conn.commit()
+            # Log action
+            if admin_id and admin_email:
+                action = "activate" if is_active else "deactivate"
+                target_email = self.get_user_email(user_id)
+                self.log_admin_action(admin_id, admin_email, action, user_id, target_email)
+            return True
+        except Exception as e:
+            st.error(f"Failed to update user status: {e}")
+            return False
+
+    def reset_user_password(self, user_id, admin_id=None, admin_email=None):
+        """Admin resets a user's password, sends new temp password, and sets must_change_password. Logs action."""
+        try:
+            with self.db.engine.connect() as conn:
+                # Get user info
+                user_query = text("SELECT email, full_name FROM users WHERE id = :user_id")
+                user = conn.execute(user_query, {'user_id': user_id}).fetchone()
+                if not user:
+                    return False, "User not found"
+                temp_password = self._generate_temp_password()
+                password_hash = self._hash_password(temp_password)
+                update_query = text("""
+                    UPDATE users SET password_hash = :password_hash, must_change_password = TRUE WHERE id = :user_id
+                """)
+                conn.execute(update_query, {'password_hash': password_hash, 'user_id': user_id})
+                conn.commit()
+                # Send email
+                email_sent, email_msg = self.send_temp_password_email(user.email, temp_password, user.full_name)
+                # Log action
+                if admin_id and admin_email:
+                    self.log_admin_action(admin_id, admin_email, "reset_password", user_id, user.email)
+                if email_sent:
+                    return True, f"Temporary password sent to {user.email}."
+                else:
+                    return True, f"Password reset. Email not sent: {email_msg}. Temporary password: {temp_password}"
+        except Exception as e:
+            return False, f"Password reset failed: {e}"
+
+    def change_user_role(self, user_id, new_role, admin_id=None, admin_email=None):
+        """Admin changes a user's role (user/admin) and logs action"""
+        try:
+            with self.db.engine.connect() as conn:
+                update_query = text("UPDATE users SET role = :role WHERE id = :user_id")
+                conn.execute(update_query, {'role': new_role, 'user_id': user_id})
+                conn.commit()
+            # Log action
+            if admin_id and admin_email:
+                target_email = self.get_user_email(user_id)
+                self.log_admin_action(admin_id, admin_email, f"change_role_to_{new_role}", user_id, target_email)
+            return True
+        except Exception as e:
+            st.error(f"Failed to change user role: {e}")
+            return False
+
+    def delete_user(self, user_id, admin_id=None, admin_email=None):
+        """Admin deletes a user and all related data (projects, meetings, updates, issues). Logs action."""
+        try:
+            with self.db.engine.connect() as conn:
+                # Get user email
+                target_email = self.get_user_email(user_id)
+                # Delete related data
+                conn.execute(text("DELETE FROM issues WHERE user_id = :user_id"), {'user_id': user_id})
+                conn.execute(text("DELETE FROM client_updates WHERE user_id = :user_id"), {'user_id': user_id})
+                conn.execute(text("DELETE FROM meetings WHERE user_id = :user_id"), {'user_id': user_id})
+                conn.execute(text("DELETE FROM projects WHERE user_id = :user_id"), {'user_id': user_id})
+                # Delete user
+                conn.execute(text("DELETE FROM users WHERE id = :user_id"), {'user_id': user_id})
+                conn.commit()
+            # Log action
+            if admin_id and admin_email:
+                self.log_admin_action(admin_id, admin_email, "delete_user", user_id, target_email)
+            return True
+        except Exception as e:
+            st.error(f"Failed to delete user: {e}")
+            return False
+
+    def get_user_email(self, user_id):
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("SELECT email FROM users WHERE id = :user_id")
+                result = conn.execute(query, {'user_id': user_id}).fetchone()
+                return result[0] if result else None
+        except Exception:
+            return None
+
+    def get_audit_logs(self, limit=100):
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT :limit")
+                result = conn.execute(query, {'limit': limit})
+                rows = result.fetchall()
+                if rows:
+                    columns = ['id', 'admin_id', 'admin_email', 'action', 'target_user_id', 'target_email', 'details', 'timestamp']
+                    return pd.DataFrame(rows, columns=columns)
+                return pd.DataFrame()
+        except Exception as e:
+            st.error(f"Error getting audit logs: {e}")
+            return pd.DataFrame()
+
+    def log_admin_action(self, admin_id, admin_email, action, target_user_id, target_email, details=None):
+        try:
+            with self.db.engine.connect() as conn:
+                query = text("""
+                    INSERT INTO audit_logs (admin_id, admin_email, action, target_user_id, target_email, details)
+                    VALUES (:admin_id, :admin_email, :action, :target_user_id, :target_email, :details)
+                """)
+                conn.execute(query, {
+                    'admin_id': admin_id,
+                    'admin_email': admin_email,
+                    'action': action,
+                    'target_user_id': target_user_id,
+                    'target_email': target_email,
+                    'details': details
+                })
+                conn.commit()
+        except Exception as e:
+            st.error(f"Failed to log admin action: {e}")
 
 # Initialize auth instance
 auth = NeonAuth() 

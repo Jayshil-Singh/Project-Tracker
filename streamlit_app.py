@@ -20,7 +20,7 @@ from database_postgres import ProjectOpsDatabase
 from chatbot import ProjectChatbot
 from reports import ReportGenerator
 from neon_auth import auth
-from login_page import render_login_page, check_if_admin_exists
+from login_page import render_login_page, check_if_admin_exists, render_force_password_change
 
 # Initialize components
 db = ProjectOpsDatabase()
@@ -92,8 +92,11 @@ st.markdown("""
 # Authentication check
 def check_authentication():
     """Check if user is authenticated"""
+    # If user needs to change password, show force password change screen
+    if st.session_state.get('pending_password_change'):
+        render_force_password_change()
+        st.stop()
     current_user = auth.get_current_user()
-    
     if not current_user:
         # Check if admin exists, if not show admin setup
         if not check_if_admin_exists():
@@ -105,7 +108,6 @@ def check_authentication():
             # Show login page
             render_login_page()
             st.stop()
-    
     return current_user
 
 # Get current user
@@ -132,11 +134,109 @@ with st.sidebar:
     st.markdown("---")
 
 # Main navigation
+menu_options = [
+    "🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics"
+]
+if current_user['role'] == 'admin':
+    menu_options.append("👥 User Management")
 menu = st.sidebar.selectbox(
     "Navigation",
-    ["🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics"],
+    menu_options,
     key="main_navigation"
 )
+
+# Admin-only User Management
+if menu == "👥 User Management" and current_user['role'] == 'admin':
+    st.markdown('<h1 class="main-header">User Management</h1>', unsafe_allow_html=True)
+    st.markdown("Add new users. They will receive a temporary password and must change it on first login.")
+    with st.form("add_user_form"):
+        new_email = st.text_input("User Email", placeholder="user@example.com", key="new_user_email")
+        new_name = st.text_input("Full Name", placeholder="Full Name", key="new_user_name")
+        new_role = st.selectbox("Role", ["user", "admin"], key="new_user_role")
+        submitted = st.form_submit_button("➕ Create User", use_container_width=True)
+        if submitted:
+            if not new_email or not new_name:
+                st.error("Please fill in all fields.")
+            else:
+                success, msg = auth.create_user_with_temp_password(new_email, new_name, new_role)
+                if success:
+                    # Log action
+                    auth.log_admin_action(current_user['id'], current_user['email'], "create_user", None, new_email, f"role={new_role}")
+                    st.success(msg)
+                else:
+                    st.error(msg)
+    st.markdown("---")
+    st.subheader("All Users")
+    users_df = auth.get_all_users()
+    if not users_df.empty:
+        users_df['Status'] = users_df['is_active'].map(lambda x: 'Active' if x else 'Inactive')
+        for idx, user in users_df.iterrows():
+            col1, col2, col3, col4, col5, col6, col7 = st.columns([3, 2, 2, 2, 2, 2, 2])
+            col1.markdown(f"**{user['email']}**")
+            col2.markdown(user['full_name'])
+            # Role change dropdown
+            if user['email'] != current_user['email']:
+                new_role = col3.selectbox("Role", ["user", "admin"], index=0 if user['role']=="user" else 1, key=f"role_{user['id']}")
+                if new_role != user['role']:
+                    if col3.button("Update Role", key=f"update_role_{user['id']}"):
+                        auth.change_user_role(user['id'], new_role, current_user['id'], current_user['email'])
+                        st.success(f"Role updated for {user['email']}.")
+                        st.rerun()
+            else:
+                col3.markdown(user['role'])
+            col4.markdown(user['Status'])
+            # Deactivate/reactivate
+            if user['email'] != current_user['email']:
+                if user['is_active']:
+                    if col5.button("Deactivate", key=f"deactivate_{user['id']}"):
+                        auth.set_user_active(user['id'], False, current_user['id'], current_user['email'])
+                        st.success(f"User {user['email']} deactivated.")
+                        st.rerun()
+                else:
+                    if col5.button("Reactivate", key=f"reactivate_{user['id']}"):
+                        auth.set_user_active(user['id'], True, current_user['id'], current_user['email'])
+                        st.success(f"User {user['email']} reactivated.")
+                        st.rerun()
+            else:
+                col5.markdown("-")
+            # Password reset
+            if user['email'] != current_user['email']:
+                if col6.button("Reset Password", key=f"resetpw_{user['id']}"):
+                    success, msg = auth.reset_user_password(user['id'], current_user['id'], current_user['email'])
+                    if success:
+                        st.success(msg)
+                    else:
+                        st.error(msg)
+                    st.rerun()
+            else:
+                col6.markdown("-")
+            # User deletion
+            if user['email'] != current_user['email']:
+                if col7.button("Delete", key=f"delete_{user['id']}"):
+                    if st.session_state.get(f"confirm_delete_{user['id']}"):
+                        if auth.delete_user(user['id'], current_user['id'], current_user['email']):
+                            st.success(f"User {user['email']} deleted.")
+                            st.rerun()
+                        else:
+                            st.error("Failed to delete user.")
+                    else:
+                        st.session_state[f"confirm_delete_{user['id']}"] = True
+                        st.warning(f"Click again to confirm deletion of {user['email']}")
+                        st.stop()
+            else:
+                col7.markdown("-")
+    else:
+        st.info("No users found.")
+    st.markdown("---")
+    st.subheader("Audit Logs (last 100 actions)")
+    logs_df = auth.get_audit_logs(limit=100)
+    if not logs_df.empty:
+        logs_df = logs_df[['timestamp', 'admin_email', 'action', 'target_email', 'details']]
+        logs_df.columns = ['Time', 'Admin', 'Action', 'Target', 'Details']
+        st.dataframe(logs_df, use_container_width=True)
+    else:
+        st.info("No audit logs found.")
+    st.stop()
 
 # Main content area
 if menu == "🏠 Dashboard":
