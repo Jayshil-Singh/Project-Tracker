@@ -24,6 +24,7 @@ from chatbot import ProjectChatbot
 from reports import ReportGenerator
 from neon_auth import auth
 from login_page import render_login_page, check_if_admin_exists, render_force_password_change
+from email_management import render_email_management_page
 
 # Initialize components
 db = ProjectOpsDatabase()
@@ -138,7 +139,7 @@ with st.sidebar:
 
 # Main navigation
 menu_options = [
-    "🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics"
+    "🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics", "📧 Email Integration"
 ]
 if current_user['role'] == 'admin':
     menu_options.append("👥 User Management")
@@ -847,4 +848,7 @@ elif menu == "📈 Analytics":
             st.metric("Pending Issues", pending_issues_count)
     
     else:
-        st.info("No data available for analytics") 
+        st.info("No data available for analytics")
+
+elif menu == "📧 Email Integration":
+    render_email_management_page(db, current_user['id']) 
