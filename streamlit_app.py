@@ -435,20 +435,24 @@ elif menu == "📁 Project Tracker":
                                 st.session_state[f"confirm_delete_{project['id']}"] = True
                                 st.warning(f"⚠️ Click again to confirm deletion of '{project['project_name']}'")
                                 st.rerun()
-                    with st.expander(f"📄 View Details - {project['project_name']}", key=f"details_{project['id']}"):
-                        st.markdown(f"**Description:** {project['description']}")
-                        if project['file_path']:
-                            st.markdown(f"**File:** {project['file_path']}")
-                        col1d, col2d, col3d = st.columns(3)
-                        with col1d:
-                            project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
-                            st.markdown(f"**Meetings:** {len(project_meetings)}")
-                        with col2d:
-                            project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
-                            st.markdown(f"**Updates:** {len(project_updates)}")
-                        with col3d:
-                            project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
-                            st.markdown(f"**Issues:** {len(project_issues)}")
+                    # Debug print
+                    st.write("DEBUG project:", project)
+                    # Only render expander if project_name and id are not null
+                    if pd.notnull(project['project_name']) and pd.notnull(project['id']):
+                        with st.expander(f"📄 View Details - {project['project_name']}", key=f"details_{str(project['id'])}"):
+                            st.markdown(f"**Description:** {project['description']}")
+                            if project['file_path']:
+                                st.markdown(f"**File:** {project['file_path']}")
+                            col1d, col2d, col3d = st.columns(3)
+                            with col1d:
+                                project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
+                                st.markdown(f"**Meetings:** {len(project_meetings)}")
+                            with col2d:
+                                project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
+                                st.markdown(f"**Updates:** {len(project_updates)}")
+                            with col3d:
+                                project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
+                                st.markdown(f"**Issues:** {len(project_issues)}")
                     st.divider()
             col1e, col2e = st.columns(2)
             with col1e:
