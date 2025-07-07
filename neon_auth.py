@@ -311,11 +311,12 @@ class NeonAuth:
     def send_temp_password_email(self, to_email, temp_password, full_name):
         """Send temp password email if SMTP is configured in Streamlit secrets"""
         try:
-            smtp_host = st.secrets.get("SMTP_HOST")
-            smtp_port = int(st.secrets.get("SMTP_PORT", 587))
-            smtp_user = st.secrets.get("SMTP_USER")
-            smtp_pass = st.secrets.get("SMTP_PASS")
-            from_email = st.secrets.get("SMTP_FROM", smtp_user)
+            smtp_config = st.secrets.get("email", {})
+            smtp_host = smtp_config.get("smtp_host")
+            smtp_port = int(smtp_config.get("smtp_port", 587))
+            smtp_user = smtp_config.get("smtp_user")
+            smtp_pass = smtp_config.get("smtp_password")
+            from_email = smtp_config.get("from_email", smtp_user)
             if not (smtp_host and smtp_user and smtp_pass):
                 return False, "SMTP not configured."
             subject = "Your Project Tracker Account - Temporary Password"
