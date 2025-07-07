@@ -89,7 +89,7 @@ class OutlookEmailIntegration:
                 'client_id': self.client_id,
                 'client_secret': self.client_secret,
                 'code': auth_code,
-                'redirect_uri': 'http://localhost:8501',
+                'redirect_uri': 'https://ps-project-tracker.streamlit.app/',
                 'grant_type': 'authorization_code'
             }
             
