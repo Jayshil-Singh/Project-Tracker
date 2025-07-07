@@ -331,7 +331,7 @@ class ProjectOpsDatabase:
                 result = conn.execute(query, {'search_term': f'%{search_term}%'})
                 rows = result.fetchall()
                 if rows:
-                    columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path']
+                    columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path', 'user_id']
                     return pd.DataFrame(rows, columns=columns)
                 return pd.DataFrame()
         except Exception as e:
