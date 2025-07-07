@@ -79,11 +79,19 @@ class NeonAuth:
                     )
                 """))
                 
-                # Add user_id to existing tables for multi-tenancy (cross-db compatible)
+                # Detect database dialect
+                dialect = self.db.engine.dialect.name
+
                 for table in ["projects", "meetings", "client_updates", "issues"]:
-                    # Check if user_id column exists
-                    col_check = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
-                    col_names = [col[1] for col in col_check]
+                    if dialect == "sqlite":
+                        col_check = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+                        col_names = [col[1] for col in col_check]
+                    else:  # Assume PostgreSQL
+                        col_check = conn.execute(
+                            text("SELECT column_name FROM information_schema.columns WHERE table_name = :table"),
+                            {"table": table}
+                        ).fetchall()
+                        col_names = [col[0] for col in col_check]
                     if "user_id" not in col_names:
                         conn.execute(text(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER"))
                 conn.commit()
