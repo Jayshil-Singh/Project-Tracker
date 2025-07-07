@@ -378,4 +378,34 @@ class ProjectOpsDatabase:
                 return None
         except Exception as e:
             st.error(f"Error getting project: {e}")
+            return None
+    
+    def get_project_summary(self, project_id):
+        """Get comprehensive project summary (PostgreSQL version)"""
+        try:
+            with self.engine.connect() as conn:
+                # Get project details
+                project = pd.read_sql_query("SELECT * FROM projects WHERE id = %s", conn, params=(project_id,))
+                # Get meetings count
+                meetings_count = pd.read_sql_query("SELECT COUNT(*) as count FROM meetings WHERE project_id = %s", conn, params=(project_id,))
+                # Get issues count
+                issues_count = pd.read_sql_query("SELECT COUNT(*) as count FROM issues WHERE project_id = %s", conn, params=(project_id,))
+                # Get pending issues count
+                pending_issues = pd.read_sql_query("SELECT COUNT(*) as count FROM issues WHERE project_id = %s AND status = 'Pending'", conn, params=(project_id,))
+                # Get recent updates
+                recent_updates = pd.read_sql_query("""
+                    SELECT * FROM client_updates 
+                    WHERE project_id = %s 
+                    ORDER BY update_date DESC 
+                    LIMIT 5
+                """, conn, params=(project_id,))
+                return {
+                    'project': project,
+                    'meetings_count': meetings_count.iloc[0]['count'],
+                    'issues_count': issues_count.iloc[0]['count'],
+                    'pending_issues': pending_issues.iloc[0]['count'],
+                    'recent_updates': recent_updates
+                }
+        except Exception as e:
+            st.error(f"Error getting project summary: {e}")
             return None 
