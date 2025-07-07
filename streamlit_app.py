@@ -1,191 +1,160 @@
+#!/usr/bin/env python3
+"""
+ProjectOps Assistant - Streamlit App
+A comprehensive project management system with AI chatbot integration
+"""
+
 import streamlit as st
 import pandas as pd
-from database_postgres import ProjectOpsDatabase
-from chatbot import ProjectOpsChatbot
-import reports
-import os
-from datetime import datetime
-import streamlit_authenticator as stauth
 import plotly.express as px
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+from datetime import datetime, timedelta
+import os
+import sys
 
+# Add current directory to path for imports
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import modules
+from database_postgres import ProjectOpsDatabase
+from chatbot import ProjectChatbot
+from reports import ReportGenerator
+from neon_auth import auth
+from login_page import render_login_page, check_if_admin_exists
+
+# Initialize components
+db = ProjectOpsDatabase()
+chatbot = ProjectChatbot(db)
+reports = ReportGenerator()
+
+# Page configuration
 st.set_page_config(
     page_title="ProjectOps Assistant",
-    page_icon="📊",
+    page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for professional styling
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
         color: #1f77b4;
         text-align: center;
         margin-bottom: 2rem;
-        padding: 1rem;
-        background: linear-gradient(90deg, #1f77b4, #ff7f0e);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
+        font-size: 2.5rem;
+        font-weight: bold;
     }
-    
     .metric-card {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         padding: 1.5rem;
         border-radius: 10px;
         color: white;
         text-align: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin: 0.5rem 0;
     }
-    
     .metric-value {
         font-size: 2rem;
         font-weight: bold;
         margin-bottom: 0.5rem;
     }
-    
     .metric-label {
-        font-size: 0.9rem;
+        font-size: 1rem;
         opacity: 0.9;
     }
-    
-    .status-badge {
-        padding: 0.25rem 0.75rem;
-        border-radius: 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-    }
-    
-    .status-in-progress {
-        background-color: #ffd700;
-        color: #000;
-    }
-    
-    .status-completed {
-        background-color: #28a745;
-        color: white;
-    }
-    
-    .status-on-hold {
-        background-color: #dc3545;
-        color: white;
-    }
-    
-    .sidebar-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 1rem;
-        border-radius: 10px;
-        color: white;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    
     .chat-message {
         padding: 1rem;
-        border-radius: 10px;
         margin: 0.5rem 0;
+        border-radius: 10px;
+        border-left: 4px solid #1f77b4;
     }
-    
     .user-message {
-        background-color: #e3f2fd;
-        border-left: 4px solid #2196f3;
+        background: #f0f8ff;
+        border-left-color: #1f77b4;
     }
-    
     .bot-message {
-        background-color: #f3e5f5;
-        border-left: 4px solid #9c27b0;
+        background: #f8f9fa;
+        border-left-color: #28a745;
     }
-    
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+    .stButton > button {
+        border-radius: 20px;
+        font-weight: bold;
     }
-    
-    .stTabs [data-baseweb="tab"] {
-        background-color: #f0f2f6;
-        border-radius: 4px 4px 0px 0px;
-        padding: 10px 16px;
+    .stSelectbox > div > div {
+        border-radius: 10px;
     }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #1f77b4;
-        color: white;
+    .stTextInput > div > div > input {
+        border-radius: 10px;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- AUTHENTICATION ---
-credentials = {
-    "usernames": {
-        "admin": {
-            "name": "admin",
-            "password": "$2b$12$40mIeAd..6Vxumgh22GJyObRourSvBms26ddHZL9kxlpjtA5.J16C"
-        }
-    }
-}
-
-authenticator = stauth.Authenticate(
-    credentials,
-    "projectops",  # cookie_name
-    "abcdef",      # key
-    1               # cookie_expiry_days
-)
-name, authentication_status, username = authenticator.login('Login')
-
-if authentication_status is False:
-    st.error('Username/password is incorrect')
-    st.stop()
-elif authentication_status is None:
-    st.warning('Please enter your username and password')
-    st.stop()
-
-# --- END AUTHENTICATION ---
-
-# Initialize PostgreSQL database
-try:
-    db = ProjectOpsDatabase()  # Will use st.secrets["DB_URL"] or fallback to SQLite
-    chatbot = ProjectOpsChatbot(db)
-    st.success("✅ Connected to database successfully!")
-except Exception as e:
-    st.error(f"❌ Database connection failed: {e}")
-    st.info("💡 Make sure to configure your database URL in Streamlit Cloud secrets")
-    st.stop()
-
-# Sidebar with professional styling
-with st.sidebar:
-    st.markdown('<div class="sidebar-header">', unsafe_allow_html=True)
-    st.markdown("### 📊 ProjectOps Assistant")
-    st.markdown("Enterprise Project Management")
-    st.markdown("</div>", unsafe_allow_html=True)
+# Authentication check
+def check_authentication():
+    """Check if user is authenticated"""
+    current_user = auth.get_current_user()
     
-    st.markdown("**👤 Admin:** Jayshil Singh")
+    if not current_user:
+        # Check if admin exists, if not show admin setup
+        if not check_if_admin_exists():
+            st.markdown('<h1 class="main-header">🔐 Project Tracker Setup</h1>', unsafe_allow_html=True)
+            from login_page import render_admin_setup
+            render_admin_setup()
+            st.stop()
+        else:
+            # Show login page
+            render_login_page()
+            st.stop()
+    
+    return current_user
+
+# Get current user
+current_user = check_authentication()
+
+# User info in sidebar
+with st.sidebar:
+    st.markdown("### 👤 User Info")
+    st.markdown(f"**Name:** {current_user['full_name']}")
+    st.markdown(f"**Email:** {current_user['email']}")
+    st.markdown(f"**Role:** {current_user['role'].title()}")
+    
     st.markdown("---")
     
-    # Navigation
-    menu = st.selectbox(
-        "Navigation",
-        ["📊 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics"]
-    )
+    # Logout button
+    if st.button("🚪 Logout", key="logout_btn", use_container_width=True):
+        if 'session_token' in st.session_state:
+            auth.logout_user(st.session_state.session_token)
+            del st.session_state.session_token
+            del st.session_state.user_info
+        st.success("✅ Logged out successfully!")
+        st.rerun()
+    
+    st.markdown("---")
+
+# Main navigation
+menu = st.sidebar.selectbox(
+    "Navigation",
+    ["🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics"],
+    key="main_navigation"
+)
 
 # Main content area
-if menu == "📊 Dashboard":
+if menu == "🏠 Dashboard":
     st.markdown('<h1 class="main-header">ProjectOps Assistant Dashboard</h1>', unsafe_allow_html=True)
     
-    # Get data for metrics
-    projects = db.get_all_projects()
-    meetings = db.get_all_meetings()
-    issues = db.get_all_issues()
+    # Get user-specific data
+    projects = db.get_all_projects(current_user['id'])
+    meetings = db.get_all_meetings(current_user['id'])
+    issues = db.get_all_issues(current_user['id'])
     
-    # Metrics Row
+    # Key Metrics Row
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
+        total_projects = len(projects) if not projects.empty else 0
         st.markdown(f"""
         <div class="metric-card">
-            <div class="metric-value">{len(projects)}</div>
+            <div class="metric-value">{total_projects}</div>
             <div class="metric-label">Total Projects</div>
         </div>
         """, unsafe_allow_html=True)
@@ -322,7 +291,7 @@ elif menu == "📁 Project Tracker":
                         success = db.add_project(
                             project_name, client_name, software, vendor,
                             start_date.strftime('%Y-%m-%d'), deadline.strftime('%Y-%m-%d'),
-                            status, description, file_path
+                            status, description, file_path, current_user['id']
                         )
                         if success:
                             st.success(f"✅ Project '{project_name}' added successfully!")
@@ -331,7 +300,7 @@ elif menu == "📁 Project Tracker":
                             st.error("❌ Failed to add project. Please try again.")
     
     with tab2:
-        projects = db.get_all_projects()
+        projects = db.get_all_projects(current_user['id'])
         if not projects.empty:
             # Filters
             col1, col2, col3 = st.columns(3)
@@ -399,21 +368,14 @@ elif menu == "📁 Project Tracker":
                         col1, col2, col3 = st.columns(3)
                         
                         with col1:
-                            meetings = db.get_all_meetings()
                             project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
                             st.markdown(f"**Meetings:** {len(project_meetings)}")
                         
                         with col2:
-                            updates = pd.DataFrame()
-                            if not projects.empty:
-                                updates = pd.concat([
-                                    db.get_client_updates_by_project(pid) for pid in projects['id'].tolist()
-                                ], ignore_index=True)
-                            project_updates = updates[updates['project_id'] == project['id']] if not updates.empty else pd.DataFrame()
+                            project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
                             st.markdown(f"**Updates:** {len(project_updates)}")
                         
                         with col3:
-                            issues = db.get_all_issues()
                             project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
                             st.markdown(f"**Issues:** {len(project_issues)}")
                     
@@ -457,7 +419,7 @@ elif menu == "🗓️ Meeting & MoM Log":
     with tab1:
         with st.expander("Log New Meeting", expanded=True):
             with st.form("meeting_form"):
-                projects = db.get_all_projects()
+                projects = db.get_all_projects(current_user['id'])
                 project_options = projects[["id", "project_name"]].values.tolist()
                 project_dict = {name: pid for pid, name in project_options}
                 
@@ -481,13 +443,14 @@ elif menu == "🗓️ Meeting & MoM Log":
                         project_dict[project_name],
                         meeting_date.strftime('%Y-%m-%d'),
                         attendees, agenda, mom, next_steps,
-                        follow_up_date.strftime('%Y-%m-%d')
+                        follow_up_date.strftime('%Y-%m-%d'),
+                        current_user['id']
                     )
                     st.success(f"✅ Meeting for '{project_name}' logged successfully!")
                     st.rerun()
     
     with tab2:
-        meetings = db.get_all_meetings()
+        meetings = db.get_all_meetings(current_user['id'])
         if not meetings.empty:
             st.dataframe(meetings, use_container_width=True)
             
@@ -514,7 +477,7 @@ elif menu == "🧾 Client Update Log":
     with tab1:
         with st.expander("Log Client Update", expanded=True):
             with st.form("update_form"):
-                projects = db.get_all_projects()
+                projects = db.get_all_projects(current_user['id'])
                 project_options = projects[["id", "project_name"]].values.tolist()
                 project_dict = {name: pid for pid, name in project_options}
                 
@@ -537,7 +500,8 @@ elif menu == "🧾 Client Update Log":
                     db.add_client_update(
                         project_dict[project_name],
                         update_date.strftime('%Y-%m-%d'),
-                        summary, sent_by, mode, client_feedback, next_step
+                        summary, sent_by, mode, client_feedback, next_step,
+                        current_user['id']
                     )
                     st.success(f"✅ Update for '{project_name}' logged successfully!")
                     st.rerun()
@@ -546,7 +510,7 @@ elif menu == "🧾 Client Update Log":
         updates = pd.DataFrame()
         if not projects.empty:
             updates = pd.concat([
-                db.get_client_updates_by_project(pid) for pid in projects['id'].tolist()
+                db.get_client_updates_by_project(pid, current_user['id']) for pid in projects['id'].tolist()
             ], ignore_index=True)
         
         if not updates.empty:
@@ -575,7 +539,7 @@ elif menu == "🛠️ Issue Tracker":
     with tab1:
         with st.expander("Log New Issue", expanded=True):
             with st.form("issue_form"):
-                projects = db.get_all_projects()
+                projects = db.get_all_projects(current_user['id'])
                 project_options = projects[["id", "project_name"]].values.tolist()
                 project_dict = {name: pid for pid, name in project_options}
                 
@@ -598,13 +562,14 @@ elif menu == "🛠️ Issue Tracker":
                         project_dict[project_name],
                         date_reported.strftime('%Y-%m-%d'),
                         issue_description, status, assigned_to,
-                        resolution_date.strftime('%Y-%m-%d') if status == "Resolved" else None
+                        resolution_date.strftime('%Y-%m-%d') if status == "Resolved" else None,
+                        current_user['id']
                     )
                     st.success(f"✅ Issue for '{project_name}' logged successfully!")
                     st.rerun()
     
     with tab2:
-        issues = db.get_all_issues()
+        issues = db.get_all_issues(current_user['id'])
         if not issues.empty:
             st.dataframe(issues, use_container_width=True)
             
@@ -639,7 +604,8 @@ elif menu == "🤖 AI Chatbot":
         user_input = st.text_input("Type your question and press Enter:", placeholder="e.g., What's the status of Epicor for LTA?")
         
         if user_input:
-            response = chatbot.process_query(user_input)
+            # Pass user context to chatbot
+            response = chatbot.process_query(user_input, user_id=current_user['id'])
             st.session_state['chat_history'].append((user_input, response))
         
         # Display chat history
@@ -660,22 +626,22 @@ elif menu == "🤖 AI Chatbot":
         st.markdown("### 🎯 Quick Actions")
         
         if st.button("📊 Show All Projects", key="chat_show_projects", use_container_width=True):
-            response = chatbot.process_query("Show all projects")
+            response = chatbot.process_query("Show all projects", user_id=current_user['id'])
             st.session_state['chat_history'].append(("Show all projects", response))
             st.rerun()
         
         if st.button("📅 Recent Meetings", key="chat_recent_meetings", use_container_width=True):
-            response = chatbot.process_query("Show last meetings")
+            response = chatbot.process_query("Show last meetings", user_id=current_user['id'])
             st.session_state['chat_history'].append(("Show last meetings", response))
             st.rerun()
         
         if st.button("🚨 Pending Issues", key="chat_pending_issues", use_container_width=True):
-            response = chatbot.process_query("What issues are unresolved?")
+            response = chatbot.process_query("What issues are unresolved?", user_id=current_user['id'])
             st.session_state['chat_history'].append(("What issues are unresolved?", response))
             st.rerun()
         
         if st.button("📧 Latest Updates", key="chat_latest_updates", use_container_width=True):
-            response = chatbot.process_query("Show recent client updates")
+            response = chatbot.process_query("Show recent client updates", user_id=current_user['id'])
             st.session_state['chat_history'].append(("Show recent client updates", response))
             st.rerun()
         
@@ -696,10 +662,10 @@ elif menu == "🤖 AI Chatbot":
 elif menu == "📈 Analytics":
     st.markdown('<h1 class="main-header">Analytics & Insights</h1>', unsafe_allow_html=True)
     
-    # Get data
-    projects = db.get_all_projects()
-    meetings = db.get_all_meetings()
-    issues = db.get_all_issues()
+    # Get user-specific data
+    projects = db.get_all_projects(current_user['id'])
+    meetings = db.get_all_meetings(current_user['id'])
+    issues = db.get_all_issues(current_user['id'])
     
     if not projects.empty:
         # Project Analytics

@@ -40,7 +40,8 @@ class ProjectOpsDatabase:
                 Column('deadline', String(20)),
                 Column('status', String(50), default='In Progress'),
                 Column('description', Text),
-                Column('file_path', String(500))
+                Column('file_path', String(500)),
+                Column('user_id', Integer)
             )
             
             # Meetings table
@@ -52,7 +53,8 @@ class ProjectOpsDatabase:
                 Column('agenda', String(500)),
                 Column('mom', Text),
                 Column('next_steps', Text),
-                Column('follow_up_date', String(20))
+                Column('follow_up_date', String(20)),
+                Column('user_id', Integer)
             )
             
             # Client updates table
@@ -64,7 +66,8 @@ class ProjectOpsDatabase:
                 Column('sent_by', String(255)),
                 Column('mode', String(50)),
                 Column('client_feedback', Text),
-                Column('next_step', Text)
+                Column('next_step', Text),
+                Column('user_id', Integer)
             )
             
             # Issues table
@@ -75,7 +78,8 @@ class ProjectOpsDatabase:
                 Column('description', Text),
                 Column('status', String(50), default='Pending'),
                 Column('assigned_to', String(255)),
-                Column('resolution_date', String(20))
+                Column('resolution_date', String(20)),
+                Column('user_id', Integer)
             )
             
             # Create all tables
@@ -84,13 +88,13 @@ class ProjectOpsDatabase:
         except Exception as e:
             st.error(f"Error creating tables: {e}")
     
-    def add_project(self, project_name, client_name, software, vendor, start_date, deadline, status, description, file_path=None):
+    def add_project(self, project_name, client_name, software, vendor, start_date, deadline, status, description, file_path=None, user_id=None):
         """Add a new project"""
         try:
             with self.engine.connect() as conn:
                 query = text("""
-                    INSERT INTO projects (project_name, client_name, software, vendor, start_date, deadline, status, description, file_path)
-                    VALUES (:project_name, :client_name, :software, :vendor, :start_date, :deadline, :status, :description, :file_path)
+                    INSERT INTO projects (project_name, client_name, software, vendor, start_date, deadline, status, description, file_path, user_id)
+                    VALUES (:project_name, :client_name, :software, :vendor, :start_date, :deadline, :status, :description, :file_path, :user_id)
                 """)
                 conn.execute(query, {
                     'project_name': project_name,
@@ -101,7 +105,8 @@ class ProjectOpsDatabase:
                     'deadline': deadline,
                     'status': status,
                     'description': description,
-                    'file_path': file_path
+                    'file_path': file_path,
+                    'user_id': user_id
                 })
                 conn.commit()
                 return True
@@ -109,28 +114,38 @@ class ProjectOpsDatabase:
             st.error(f"Error adding project: {e}")
             return False
     
-    def get_all_projects(self):
-        """Get all projects"""
+    def get_all_projects(self, user_id=None):
+        """Get all projects (optionally filtered by user)"""
         try:
-            query = text("SELECT * FROM projects ORDER BY id DESC")
-            with self.engine.connect() as conn:
-                result = conn.execute(query)
-                rows = result.fetchall()
-                if rows:
-                    columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path']
-                    return pd.DataFrame(rows, columns=columns)
-                return pd.DataFrame()
+            if user_id:
+                query = text("SELECT * FROM projects WHERE user_id = :user_id ORDER BY id DESC")
+                with self.engine.connect() as conn:
+                    result = conn.execute(query, {'user_id': user_id})
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path', 'user_id']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
+            else:
+                query = text("SELECT * FROM projects ORDER BY id DESC")
+                with self.engine.connect() as conn:
+                    result = conn.execute(query)
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_name', 'client_name', 'software', 'vendor', 'start_date', 'deadline', 'status', 'description', 'file_path', 'user_id']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
         except Exception as e:
             st.error(f"Error getting projects: {e}")
             return pd.DataFrame()
     
-    def add_meeting(self, project_id, meeting_date, attendees, agenda, mom, next_steps, follow_up_date):
+    def add_meeting(self, project_id, meeting_date, attendees, agenda, mom, next_steps, follow_up_date, user_id=None):
         """Add a new meeting"""
         try:
             with self.engine.connect() as conn:
                 query = text("""
-                    INSERT INTO meetings (project_id, meeting_date, attendees, agenda, mom, next_steps, follow_up_date)
-                    VALUES (:project_id, :meeting_date, :attendees, :agenda, :mom, :next_steps, :follow_up_date)
+                    INSERT INTO meetings (project_id, meeting_date, attendees, agenda, mom, next_steps, follow_up_date, user_id)
+                    VALUES (:project_id, :meeting_date, :attendees, :agenda, :mom, :next_steps, :follow_up_date, :user_id)
                 """)
                 conn.execute(query, {
                     'project_id': project_id,
@@ -139,7 +154,8 @@ class ProjectOpsDatabase:
                     'agenda': agenda,
                     'mom': mom,
                     'next_steps': next_steps,
-                    'follow_up_date': follow_up_date
+                    'follow_up_date': follow_up_date,
+                    'user_id': user_id
                 })
                 conn.commit()
                 return True
@@ -147,33 +163,49 @@ class ProjectOpsDatabase:
             st.error(f"Error adding meeting: {e}")
             return False
     
-    def get_all_meetings(self):
-        """Get all meetings with project names"""
+    def get_all_meetings(self, user_id=None):
+        """Get all meetings with project names (optionally filtered by user)"""
         try:
-            query = text("""
-                SELECT m.*, p.project_name 
-                FROM meetings m 
-                JOIN projects p ON m.project_id = p.id 
-                ORDER BY m.meeting_date DESC
-            """)
-            with self.engine.connect() as conn:
-                result = conn.execute(query)
-                rows = result.fetchall()
-                if rows:
-                    columns = ['id', 'project_id', 'meeting_date', 'attendees', 'agenda', 'mom', 'next_steps', 'follow_up_date', 'project_name']
-                    return pd.DataFrame(rows, columns=columns)
-                return pd.DataFrame()
+            if user_id:
+                query = text("""
+                    SELECT m.*, p.project_name 
+                    FROM meetings m 
+                    JOIN projects p ON m.project_id = p.id 
+                    WHERE m.user_id = :user_id
+                    ORDER BY m.meeting_date DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query, {'user_id': user_id})
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'meeting_date', 'attendees', 'agenda', 'mom', 'next_steps', 'follow_up_date', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
+            else:
+                query = text("""
+                    SELECT m.*, p.project_name 
+                    FROM meetings m 
+                    JOIN projects p ON m.project_id = p.id 
+                    ORDER BY m.meeting_date DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query)
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'meeting_date', 'attendees', 'agenda', 'mom', 'next_steps', 'follow_up_date', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
         except Exception as e:
             st.error(f"Error getting meetings: {e}")
             return pd.DataFrame()
     
-    def add_client_update(self, project_id, update_date, summary, sent_by, mode, client_feedback, next_step):
+    def add_client_update(self, project_id, update_date, summary, sent_by, mode, client_feedback, next_step, user_id=None):
         """Add a new client update"""
         try:
             with self.engine.connect() as conn:
                 query = text("""
-                    INSERT INTO client_updates (project_id, update_date, summary, sent_by, mode, client_feedback, next_step)
-                    VALUES (:project_id, :update_date, :summary, :sent_by, :mode, :client_feedback, :next_step)
+                    INSERT INTO client_updates (project_id, update_date, summary, sent_by, mode, client_feedback, next_step, user_id)
+                    VALUES (:project_id, :update_date, :summary, :sent_by, :mode, :client_feedback, :next_step, :user_id)
                 """)
                 conn.execute(query, {
                     'project_id': project_id,
@@ -182,7 +214,8 @@ class ProjectOpsDatabase:
                     'sent_by': sent_by,
                     'mode': mode,
                     'client_feedback': client_feedback,
-                    'next_step': next_step
+                    'next_step': next_step,
+                    'user_id': user_id
                 })
                 conn.commit()
                 return True
@@ -190,34 +223,50 @@ class ProjectOpsDatabase:
             st.error(f"Error adding client update: {e}")
             return False
     
-    def get_client_updates_by_project(self, project_id):
+    def get_client_updates_by_project(self, project_id, user_id=None):
         """Get client updates for a specific project"""
         try:
-            query = text("""
-                SELECT cu.*, p.project_name 
-                FROM client_updates cu 
-                JOIN projects p ON cu.project_id = p.id 
-                WHERE cu.project_id = :project_id 
-                ORDER BY cu.update_date DESC
-            """)
-            with self.engine.connect() as conn:
-                result = conn.execute(query, {'project_id': project_id})
-                rows = result.fetchall()
-                if rows:
-                    columns = ['id', 'project_id', 'update_date', 'summary', 'sent_by', 'mode', 'client_feedback', 'next_step', 'project_name']
-                    return pd.DataFrame(rows, columns=columns)
-                return pd.DataFrame()
+            if user_id:
+                query = text("""
+                    SELECT cu.*, p.project_name 
+                    FROM client_updates cu 
+                    JOIN projects p ON cu.project_id = p.id 
+                    WHERE cu.project_id = :project_id AND cu.user_id = :user_id
+                    ORDER BY cu.update_date DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query, {'project_id': project_id, 'user_id': user_id})
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'update_date', 'summary', 'sent_by', 'mode', 'client_feedback', 'next_step', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
+            else:
+                query = text("""
+                    SELECT cu.*, p.project_name 
+                    FROM client_updates cu 
+                    JOIN projects p ON cu.project_id = p.id 
+                    WHERE cu.project_id = :project_id 
+                    ORDER BY cu.update_date DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query, {'project_id': project_id})
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'update_date', 'summary', 'sent_by', 'mode', 'client_feedback', 'next_step', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
         except Exception as e:
             st.error(f"Error getting client updates: {e}")
             return pd.DataFrame()
     
-    def add_issue(self, project_id, date_reported, description, status, assigned_to, resolution_date=None):
+    def add_issue(self, project_id, date_reported, description, status, assigned_to, resolution_date=None, user_id=None):
         """Add a new issue"""
         try:
             with self.engine.connect() as conn:
                 query = text("""
-                    INSERT INTO issues (project_id, date_reported, description, status, assigned_to, resolution_date)
-                    VALUES (:project_id, :date_reported, :description, :status, :assigned_to, :resolution_date)
+                    INSERT INTO issues (project_id, date_reported, description, status, assigned_to, resolution_date, user_id)
+                    VALUES (:project_id, :date_reported, :description, :status, :assigned_to, :resolution_date, :user_id)
                 """)
                 conn.execute(query, {
                     'project_id': project_id,
@@ -225,7 +274,8 @@ class ProjectOpsDatabase:
                     'description': description,
                     'status': status,
                     'assigned_to': assigned_to,
-                    'resolution_date': resolution_date
+                    'resolution_date': resolution_date,
+                    'user_id': user_id
                 })
                 conn.commit()
                 return True
@@ -233,22 +283,38 @@ class ProjectOpsDatabase:
             st.error(f"Error adding issue: {e}")
             return False
     
-    def get_all_issues(self):
-        """Get all issues with project names"""
+    def get_all_issues(self, user_id=None):
+        """Get all issues with project names (optionally filtered by user)"""
         try:
-            query = text("""
-                SELECT i.*, p.project_name 
-                FROM issues i 
-                JOIN projects p ON i.project_id = p.id 
-                ORDER BY i.date_reported DESC
-            """)
-            with self.engine.connect() as conn:
-                result = conn.execute(query)
-                rows = result.fetchall()
-                if rows:
-                    columns = ['id', 'project_id', 'date_reported', 'description', 'status', 'assigned_to', 'resolution_date', 'project_name']
-                    return pd.DataFrame(rows, columns=columns)
-                return pd.DataFrame()
+            if user_id:
+                query = text("""
+                    SELECT i.*, p.project_name 
+                    FROM issues i 
+                    JOIN projects p ON i.project_id = p.id 
+                    WHERE i.user_id = :user_id
+                    ORDER BY i.date_reported DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query, {'user_id': user_id})
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'date_reported', 'description', 'status', 'assigned_to', 'resolution_date', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
+            else:
+                query = text("""
+                    SELECT i.*, p.project_name 
+                    FROM issues i 
+                    JOIN projects p ON i.project_id = p.id 
+                    ORDER BY i.date_reported DESC
+                """)
+                with self.engine.connect() as conn:
+                    result = conn.execute(query)
+                    rows = result.fetchall()
+                    if rows:
+                        columns = ['id', 'project_id', 'date_reported', 'description', 'status', 'assigned_to', 'resolution_date', 'user_id', 'project_name']
+                        return pd.DataFrame(rows, columns=columns)
+                    return pd.DataFrame()
         except Exception as e:
             st.error(f"Error getting issues: {e}")
             return pd.DataFrame()
