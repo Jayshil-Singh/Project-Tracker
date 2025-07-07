@@ -46,6 +46,9 @@ class OutlookEmailIntegration:
             if 'email_refresh_token' in st.session_state:
                 self.refresh_token = st.session_state.email_refresh_token
                 
+            st.write("Client ID:", self.client_id)
+            st.write("Tenant ID:", self.tenant_id)
+            
         except Exception as e:
             st.error(f"Error loading email configuration: {e}")
     
