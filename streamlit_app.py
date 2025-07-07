@@ -355,34 +355,24 @@ elif menu == "📁 Project Tracker":
         with st.expander("Add New Project", expanded=True):
             with st.form("project_form"):
                 col1, col2 = st.columns(2)
-                
                 with col1:
                     project_name = st.text_input("Project Name *", placeholder="Enter project name", key="project_name_input")
                     client_name = st.text_input("Client Name *", placeholder="Enter client name", key="client_name_input")
-                    software = st.selectbox("Software *", ["Epicor", "MYOB", "ODOO", "PayGlobal", "Other"], key="software_select")
+                    software = st.selectbox("Software *", ["Epicor", "MYOB", "ODOO", "PayGlobal", "Sage 300"], key="software_select")
                     vendor = st.text_input("Vendor *", placeholder="Enter vendor name", key="vendor_input")
-                
                 with col2:
                     start_date = st.date_input("Start Date *", key="start_date_input")
                     deadline = st.date_input("Deadline *", key="deadline_input")
                     status = st.selectbox("Status *", ["In Progress", "On Hold", "Completed"], key="status_select")
-                
                 description = st.text_area("Description *", placeholder="Enter project description", key="description_input")
-                
-                # File upload section
                 from file_uploader import render_file_upload_section
                 file_path = render_file_upload_section(project_name, client_name)
-                
-                # Validation message
                 if not project_name or not client_name or not vendor or not description:
                     st.warning("⚠️ Please fill in all required fields marked with *")
-                
-                col1, col2, col3 = st.columns([1, 1, 1])
-                with col2:
+                col1b, col2b, col3b = st.columns([1, 1, 1])
+                with col2b:
                     submitted = st.form_submit_button("➕ Add Project", use_container_width=True)
-                
                 if submitted:
-                    # Validate all required fields
                     if not project_name or not client_name or not vendor or not description:
                         st.error("❌ Please fill in all required fields marked with *")
                     elif start_date >= deadline:
@@ -398,7 +388,7 @@ elif menu == "📁 Project Tracker":
                             st.rerun()  # Refresh the form
                         else:
                             st.error("❌ Failed to add project. Please try again.")
-    
+    # OUTSIDE the form: project table, delete/export buttons, etc.
     with tab2:
         projects = db.get_all_projects(current_user['id'])
         if not projects.empty:
@@ -410,8 +400,6 @@ elif menu == "📁 Project Tracker":
                 software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()), key="software_filter_projects")
             with col3:
                 search_term = st.text_input("Search Projects", placeholder="Search by name or client", key="search_projects")
-            
-            # Apply filters
             filtered_projects = projects.copy()
             if status_filter != "All":
                 filtered_projects = filtered_projects[filtered_projects['status'] == status_filter]
@@ -422,73 +410,53 @@ elif menu == "📁 Project Tracker":
                     filtered_projects['project_name'].str.contains(search_term, case=False) |
                     filtered_projects['client_name'].str.contains(search_term, case=False)
                 ]
-            
-            # Display filtered results with delete buttons
             st.subheader(f"📋 Projects ({len(filtered_projects)} found)")
-            
             for idx, project in filtered_projects.iterrows():
                 with st.container():
                     col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
-                    
                     with col1:
                         st.markdown(f"**{project['project_name']}**")
                         st.markdown(f"*{project['client_name']} - {project['software']}*")
-                    
                     with col2:
                         st.markdown(f"**Status:** {project['status']}")
                         st.markdown(f"**Vendor:** {project['vendor']}")
-                    
                     with col3:
                         st.markdown(f"**Start:** {project['start_date']}")
                         st.markdown(f"**Deadline:** {project['deadline']}")
-                    
                     with col4:
-                        # Delete button
                         if st.button("🗑️", key=f"delete_project_{project['id']}", help="Delete project"):
                             if st.session_state.get(f"confirm_delete_{project['id']}", False):
-                                # Second confirmation
                                 if db.delete_project(project['id']):
                                     st.success(f"✅ Project '{project['project_name']}' deleted successfully!")
                                     st.rerun()
                                 else:
                                     st.error("❌ Failed to delete project")
                             else:
-                                # First confirmation
                                 st.session_state[f"confirm_delete_{project['id']}"] = True
                                 st.warning(f"⚠️ Click again to confirm deletion of '{project['project_name']}'")
                                 st.rerun()
-                    
-                    # Show project details in expander
                     with st.expander(f"📄 View Details - {project['project_name']}", key=f"details_{project['id']}"):
                         st.markdown(f"**Description:** {project['description']}")
                         if project['file_path']:
                             st.markdown(f"**File:** {project['file_path']}")
-                        
-                        # Show related data
-                        col1, col2, col3 = st.columns(3)
-                        
-                        with col1:
+                        col1d, col2d, col3d = st.columns(3)
+                        with col1d:
                             project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
                             st.markdown(f"**Meetings:** {len(project_meetings)}")
-                        
-                        with col2:
+                        with col2d:
                             project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
                             st.markdown(f"**Updates:** {len(project_updates)}")
-                        
-                        with col3:
+                        with col3d:
                             project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
                             st.markdown(f"**Issues:** {len(project_issues)}")
-                    
                     st.divider()
-            
-            # Export options
-            col1, col2 = st.columns(2)
-            with col1:
+            col1e, col2e = st.columns(2)
+            with col1e:
                 if st.button("📊 Export to PDF", key="projects_export_pdf", use_container_width=True):
                     filename = reports.export_projects_to_pdf(filtered_projects, "projects_report.pdf")
                     with open(filename, "rb") as f:
                         st.download_button("📥 Download PDF", f, file_name="projects_report.pdf", use_container_width=True)
-            with col2:
+            with col2e:
                 if st.button("📈 Export to Excel", key="projects_export_excel", use_container_width=True):
                     filename = reports.export_to_excel(filtered_projects, "projects_report.xlsx")
                     with open(filename, "rb") as f:
