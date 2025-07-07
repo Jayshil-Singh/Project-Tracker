@@ -14,7 +14,6 @@ import sys
 from file_uploader import render_file_upload_section
 
 import streamlit as st
-st.write("DB_URL from secrets:", st.secrets.get("DB_URL"))
 
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -28,7 +27,6 @@ from login_page import render_login_page, check_if_admin_exists, render_force_pa
 
 # Initialize components
 db = ProjectOpsDatabase()
-st.write("Database engine URL:", db.engine.url)
 chatbot = ProjectChatbot(db)
 reports = ReportGenerator()
 
@@ -454,8 +452,6 @@ elif menu == "📁 Project Tracker":
                                 st.session_state[f"confirm_delete_{project['id']}"] = True
                                 st.warning(f"⚠️ Click again to confirm deletion of '{project['project_name']}'")
                                 st.rerun()
-                    # Debug print
-                    st.write("DEBUG project:", project)
                     # Defensive check for project_name and id
                     pname = project.get('project_name')
                     pid = project.get('id')
