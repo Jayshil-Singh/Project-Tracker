@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import os
 import sys
+from file_uploader import render_file_upload_section
 
 import streamlit as st
 st.write("DB_URL from secrets:", st.secrets.get("DB_URL"))
