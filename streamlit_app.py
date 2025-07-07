@@ -325,11 +325,11 @@ elif menu == "📁 Project Tracker":
             # Filters
             col1, col2, col3 = st.columns(3)
             with col1:
-                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()))
+                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()), key="status_filter_projects")
             with col2:
-                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()))
+                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()), key="software_filter_projects")
             with col3:
-                search_term = st.text_input("Search Projects", placeholder="Search by name or client")
+                search_term = st.text_input("Search Projects", placeholder="Search by name or client", key="search_projects")
             
             # Apply filters
             filtered_projects = projects.copy()
@@ -367,7 +367,8 @@ elif menu == "📁 Project Tracker":
         # File management options
         file_option = st.selectbox(
             "File Management Options",
-            ["📦 Bulk File Upload", "📊 File Analytics"]
+            ["📦 Bulk File Upload", "📊 File Analytics"],
+            key="file_management_option"
         )
         
         if file_option == "📦 Bulk File Upload":
@@ -381,11 +382,11 @@ elif menu == "📁 Project Tracker":
             # Filters
             col1, col2, col3 = st.columns(3)
             with col1:
-                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()))
+                status_filter = st.selectbox("Filter by Status", ["All"] + list(projects['status'].unique()), key="status_filter_projects")
             with col2:
-                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()))
+                software_filter = st.selectbox("Filter by Software", ["All"] + list(projects['software'].unique()), key="software_filter_projects")
             with col3:
-                search_term = st.text_input("Search Projects", placeholder="Search by name or client")
+                search_term = st.text_input("Search Projects", placeholder="Search by name or client", key="search_projects")
             
             # Apply filters
             filtered_projects = projects.copy()
