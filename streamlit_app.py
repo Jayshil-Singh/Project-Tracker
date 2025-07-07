@@ -442,7 +442,7 @@ elif menu == "📁 Project Tracker":
                     pid not in seen_ids
                 ):
                     seen_ids.add(pid)
-                    with st.expander(f"📄 View Details - {pname}", key=f"details_{str(pid)}"):
+                    with st.expander(f"📄 View Details - {pname} (ID: {pid})"):
                         st.markdown(f"**Description:** {project['description']}")
                         if project['file_path']:
                             st.markdown(f"**File:** {project['file_path']}")
