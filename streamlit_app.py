@@ -357,6 +357,8 @@ elif menu == "📁 Project Tracker":
     
     with tab1:
         with st.expander("Add New Project", expanded=True):
+            # File upload section OUTSIDE the form
+            uploaded_file_path = render_file_upload_section(None, None)
             with st.form("project_form"):
                 col1, col2 = st.columns(2)
                 with col1:
@@ -369,8 +371,8 @@ elif menu == "📁 Project Tracker":
                     deadline = st.date_input("Deadline *", key="deadline_input")
                     status = st.selectbox("Status *", ["In Progress", "On Hold", "Completed"], key="status_select")
                 description = st.text_area("Description *", placeholder="Enter project description", key="description_input")
-                from file_uploader import render_file_upload_section
-                file_path = render_file_upload_section(project_name, client_name)
+                # Use st.file_uploader inside the form if needed
+                form_uploaded_file = st.file_uploader("Upload Project File (optional)", key="project_file_form")
                 if not project_name or not client_name or not vendor or not description:
                     st.warning("⚠️ Please fill in all required fields marked with *")
                 col1b, col2b, col3b = st.columns([1, 1, 1])
@@ -382,6 +384,18 @@ elif menu == "📁 Project Tracker":
                     elif start_date >= deadline:
                         st.error("❌ Deadline must be after start date")
                     else:
+                        # Prefer file uploaded in form, else use uploaded_file_path from outside
+                        file_path = None
+                        if form_uploaded_file is not None:
+                            # Save the uploaded file and get its path
+                            import os
+                            save_dir = "uploaded_files"
+                            os.makedirs(save_dir, exist_ok=True)
+                            file_path = os.path.join(save_dir, form_uploaded_file.name)
+                            with open(file_path, "wb") as f:
+                                f.write(form_uploaded_file.getbuffer())
+                        elif uploaded_file_path:
+                            file_path = uploaded_file_path
                         success = db.add_project(
                             project_name, client_name, software, vendor,
                             start_date.strftime('%Y-%m-%d'), deadline.strftime('%Y-%m-%d'),
@@ -441,9 +455,17 @@ elif menu == "📁 Project Tracker":
                                 st.rerun()
                     # Debug print
                     st.write("DEBUG project:", project)
-                    # Only render expander if project_name and id are not null
-                    if pd.notnull(project['project_name']) and pd.notnull(project['id']):
-                        with st.expander(f"📄 View Details - {project['project_name']}", key=f"details_{str(project['id'])}"):
+                    # Defensive check for project_name and id
+                    pname = project.get('project_name')
+                    pid = project.get('id')
+                    if (
+                        pd.notnull(pname) and
+                        pd.notnull(pid) and
+                        isinstance(pname, str) and
+                        str(pname).strip() and
+                        str(pid).strip()
+                    ):
+                        with st.expander(f"📄 View Details - {pname}", key=f"details_{str(pid)}"):
                             st.markdown(f"**Description:** {project['description']}")
                             if project['file_path']:
                                 st.markdown(f"**File:** {project['file_path']}")
