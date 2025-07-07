@@ -9,7 +9,6 @@ import streamlit_authenticator as stauth
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import tempfile
 
 st.set_page_config(
     page_title="ProjectOps Assistant",
@@ -145,16 +144,16 @@ elif authentication_status is None:
 
 # --- END AUTHENTICATION ---
 
-# Cloud-compatible paths
-def get_temp_dir():
-    """Get temporary directory for cloud deployment"""
-    temp_dir = tempfile.mkdtemp()
-    return temp_dir
+# Cloud-compatible database path
+db_path = "projectops_cloud.db"
 
-# Initialize database with cloud-compatible path
-db_path = os.path.join(get_temp_dir(), "projectops.db")
-db = ProjectOpsDatabase(db_path)
-chatbot = ProjectOpsChatbot(db)
+# Initialize database with error handling
+try:
+    db = ProjectOpsDatabase(db_path)
+    chatbot = ProjectOpsChatbot(db)
+except Exception as e:
+    st.error(f"Database initialization error: {e}")
+    st.stop()
 
 # Sidebar with professional styling
 with st.sidebar:
