@@ -383,6 +383,8 @@ class ProjectOpsDatabase:
     def get_project_summary(self, project_id):
         """Get comprehensive project summary (PostgreSQL version)"""
         try:
+            # Ensure project_id is a native Python int
+            project_id = int(project_id)
             with self.engine.connect() as conn:
                 # Get project details
                 project = pd.read_sql_query("SELECT * FROM projects WHERE id = %s", conn, params=(project_id,))
