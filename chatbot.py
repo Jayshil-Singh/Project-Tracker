@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from database_postgres import ProjectOpsDatabase
 
-class ProjectOpsChatbot:
+class ProjectChatbot:
     def __init__(self, db):
         self.db = db
         
