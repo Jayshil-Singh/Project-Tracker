@@ -22,12 +22,6 @@ from reports import ReportGenerator
 from neon_auth import auth
 from login_page import render_login_page, check_if_admin_exists, render_force_password_change
 
-import streamlit as st
-st.write("SMTP config:", st.secrets.get("email", {}))
-st.write("smtp_host:", repr(smtp_host))
-st.write("smtp_user:", repr(smtp_user))
-st.write("smtp_pass:", repr(smtp_pass))
-
 # Initialize components
 db = ProjectOpsDatabase()
 chatbot = ProjectChatbot(db)

@@ -317,6 +317,10 @@ class NeonAuth:
             smtp_user = smtp_config.get("smtp_user")
             smtp_pass = smtp_config.get("smtp_password")
             from_email = smtp_config.get("from_email", smtp_user)
+
+            st.write("smtp_host:", repr(smtp_host))
+            st.write("smtp_user:", repr(smtp_user))
+            st.write("smtp_pass:", repr(smtp_pass))
             if not (smtp_host and smtp_user and smtp_pass):
                 return False, "SMTP not configured."
             subject = "Your Project Tracker Account - Temporary Password"
