@@ -12,6 +12,9 @@ from datetime import datetime, timedelta
 import os
 import sys
 
+import streamlit as st
+st.write("DB_URL from secrets:", st.secrets.get("DB_URL"))
+
 # Add current directory to path for imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,6 +27,7 @@ from login_page import render_login_page, check_if_admin_exists, render_force_pa
 
 # Initialize components
 db = ProjectOpsDatabase()
+st.write("Database engine URL:", db.engine.url)
 chatbot = ProjectChatbot(db)
 reports = ReportGenerator()
 
