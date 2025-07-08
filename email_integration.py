@@ -76,7 +76,7 @@ class OutlookEmailIntegration:
         auth_url += f"&response_type=code"
         auth_url += f"&redirect_uri={redirect_uri}"
         auth_url += f"&scope={scope}"
-        auth_url += "&response_mode=query"  # Always use query mode for Streamlit
+        auth_url += "&response_mode=query&prompt=consent"  # Always use query mode for Streamlit, force consent
         
         return auth_url
     
@@ -97,6 +97,7 @@ class OutlookEmailIntegration:
             response.raise_for_status()
             
             token_data = response.json()
+            st.write(token_data)  # Debug output
             self.access_token = token_data['access_token']
             self.refresh_token = token_data['refresh_token']
             
