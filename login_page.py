@@ -27,7 +27,6 @@ def render_login_page():
     # Center the login form
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.markdown('<div class="login-container"><h1>🔐 Project Tracker</h1>', unsafe_allow_html=True)
         st.markdown('<h1 style="text-align: center; color: #1f77b4;">🔐 Project Tracker</h1>', unsafe_allow_html=True)
         st.markdown('<p style="text-align: center; color: #666;">Sign in to access your projects</p>', unsafe_allow_html=True)
         render_login_form()
