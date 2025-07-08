@@ -68,7 +68,7 @@ class OutlookEmailIntegration:
         if not all([self.client_id, self.tenant_id]):
             return None
             
-        redirect_uri = "http://localhost:8501"  # Streamlit default
+        redirect_uri = "https://ps-project-tracker.streamlit.app/"  # Streamlit default
         scope = "https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/User.Read offline_access"
         
         auth_url = f"https://login.microsoftonline.com/{self.tenant_id}/oauth2/v2.0/authorize"
