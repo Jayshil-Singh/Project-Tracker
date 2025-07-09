@@ -14,7 +14,7 @@ if not current_user:
     st.stop()
 
 # Get project_id from query params
-query_params = st.query_params
+query_params = st.query_params if hasattr(st, 'query_params') else st.experimental_get_query_params()
 project_id = query_params.get('project_id', [None])[0]
 if not project_id:
     st.error("No project selected.")
