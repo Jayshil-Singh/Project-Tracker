@@ -358,10 +358,9 @@ handle_navbar_events()
 # --- Navigation logic based on hash or session state ---
 import streamlit as st
 import re
-hash_val = st.experimental_get_query_params().get('nav', [None])[0]
+hash_val = st.query_params.get('nav', [None])[0]
 if not hash_val:
-    import urllib.parse
-    hash_val = re.sub(r'^#', '', st.experimental_get_query_params().get('nav', [None])[0] or '')
+    hash_val = re.sub(r'^#', '', st.query_params.get('nav', [None])[0] or '')
 if not hash_val:
     hash_val = st.session_state.get('active_menu', '🏠 Dashboard')
 if hash_val:
