@@ -33,6 +33,27 @@ from neon_auth import auth
 from login_page import render_login_page, check_if_admin_exists, render_force_password_change
 from email_management import render_email_management_page
 
+# --- Authentication check (must be at the very top) ---
+def check_authentication():
+    if st.session_state.get('pending_password_change'):
+        render_force_password_change()
+        st.stop()
+    current_user = auth.get_current_user()
+    if not current_user:
+        if not check_if_admin_exists():
+            st.markdown('<h1 class="main-header">🔐 Project Tracker Setup</h1>', unsafe_allow_html=True)
+            from login_page import render_admin_setup
+            render_admin_setup()
+            st.stop()
+        else:
+            render_login_page()
+            st.stop()
+    return current_user
+
+current_user = check_authentication()
+
+# --- rest of your code (navbar, sidebar, etc.) ---
+
 # Initialize components
 db = ProjectOpsDatabase()
 chatbot = ProjectChatbot(db)
