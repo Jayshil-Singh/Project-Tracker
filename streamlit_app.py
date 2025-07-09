@@ -283,7 +283,7 @@ def render_navbar(current_user):
 
 # Remove JS postMessage logic and event handler
 # --- Navigation logic based on query param ---
-menu = st.session_state['active_menu']
+menu = st.session_state.get('active_menu', 'Dashboard')
 
 # --- Main content rendering (unchanged) ---
 # Profile Picture Management Page
