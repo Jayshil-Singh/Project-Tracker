@@ -135,77 +135,54 @@ with st.sidebar:
     st.markdown(f"**Role:** {current_user['role'].title()}")
     st.markdown("---")
 
-    # Professional sidebar menu
+    # Professional sidebar menu using st.radio
     menu_options = [
-        ("🏠 Dashboard", "dashboard"),
-        ("📁 Project Tracker", "projects"),
-        ("🗓️ Meeting & MoM Log", "meetings"),
-        ("🧾 Client Update Log", "updates"),
-        ("🛠️ Issue Tracker", "issues"),
-        ("🤖 AI Chatbot", "chatbot"),
-        ("📈 Analytics", "analytics"),
-        ("📧 Email Integration", "email")
+        "🏠 Dashboard",
+        "📁 Project Tracker",
+        "🗓️ Meeting & MoM Log",
+        "🧾 Client Update Log",
+        "🛠️ Issue Tracker",
+        "🤖 AI Chatbot",
+        "📈 Analytics",
+        "📧 Email Integration"
     ]
     if current_user['role'] == 'admin':
-        menu_options.append(("👥 User Management", "users"))
-
-    # Use session state for navigation
-    if 'active_menu' not in st.session_state:
-        st.session_state['active_menu'] = menu_options[0][1]
-
-    def set_active_menu(menu_key):
-        st.session_state['active_menu'] = menu_key
+        menu_options.append("👥 User Management")
 
     st.markdown("""
     <style>
-    .sidebar-menu-item {
+    .stRadio > div {
+        flex-direction: column;
+    }
+    .stRadio label {
+        font-size: 1.08rem;
+        font-weight: 500;
         padding: 0.7rem 1rem 0.7rem 0.7rem;
         border-radius: 8px;
         margin-bottom: 0.3rem;
-        font-size: 1.08rem;
-        font-weight: 500;
         color: #222;
-        cursor: pointer;
         transition: background 0.15s;
         display: flex;
         align-items: center;
         gap: 0.7rem;
     }
-    .sidebar-menu-item.active {
-        background: linear-gradient(90deg, #1f77b4 60%, #764ba2 100%);
+    .stRadio input:checked + div > label {
+        background: linear-gradient(90deg, #1f77b4 60%, #764ba2 100%) !important;
         color: #fff !important;
         font-weight: bold;
     }
-    .sidebar-menu-item:hover {
+    .stRadio label:hover {
         background: #f0f4fa;
     }
     </style>
     """, unsafe_allow_html=True)
 
-    for label, key in menu_options:
-        active = st.session_state['active_menu'] == key
-        menu_html = f"""
-        <div class='sidebar-menu-item{' active' if active else ''}' onclick="window.location.hash='{key}'">
-            {label}
-        </div>
-        """
-        st.markdown(menu_html, unsafe_allow_html=True)
-        if st.session_state['active_menu'] == key:
-            menu = label
-
-    # JS to update session state on click (Streamlit limitation workaround)
-    st.markdown("""
-    <script>
-    const items = window.parent.document.querySelectorAll('.sidebar-menu-item');
-    items.forEach(item => {
-        item.onclick = function() {
-            const hash = this.getAttribute('onclick').split("'")[1];
-            window.parent.location.hash = hash;
-            window.parent.location.reload();
-        }
-    });
-    </script>
-    """, unsafe_allow_html=True)
+    menu = st.radio(
+        "Navigation",
+        menu_options,
+        key="main_navigation",
+        label_visibility="collapsed"
+    )
 
     st.markdown("---")
     if st.button("🚪 Logout", key="logout_btn", use_container_width=True):
