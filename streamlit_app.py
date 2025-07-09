@@ -149,7 +149,7 @@ current_user = check_authentication()
 
 # After current_user is set (after authentication):
 profile_pic_path = db.get_user_profile_picture(current_user['id'])
-if profile_pic_path and os.path.exists(profile_pic_path):
+if profile_pic_path and os.path.exists(os.path.abspath(profile_pic_path)):
     st.session_state['profile_picture'] = profile_pic_path
 else:
     st.session_state['profile_picture'] = None
@@ -189,7 +189,7 @@ if current_user:
             # Display profile picture or default avatar
             st.write("Profile picture path:", st.session_state['profile_picture'])
             st.write("File exists:", os.path.exists(st.session_state['profile_picture']) if st.session_state['profile_picture'] else False)
-            if st.session_state['profile_picture'] is not None and os.path.exists(st.session_state['profile_picture']):
+            if st.session_state['profile_picture'] and os.path.exists(os.path.abspath(st.session_state['profile_picture'])):
                 st.image(st.session_state['profile_picture'], width=60, use_column_width=True)
             else:
                 # Default avatar
