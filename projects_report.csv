@@ -1,0 +1,43 @@
+id,project_name,client_name,software,vendor,start_date,deadline,status,description,file_path,user_id
+9,Central Cuisine Restaurants & Events Center (Fire N Ice),Central Cuisine Restaurants & Events Center (Fire N Ice),ODOO,ODOO SA,2025-07-09,2025-07-31,Started,"Product: Odoo Pos Implementation
+Owner: Jayshil
+Action Items: UAT – WIP, due (15/07/2025).
+Progress: 30%
+Total Billing: $13,216.75
+Total Billed: $7,758",,1
+8,Cricket Fiji,Cricket Fiji,MYOB,MYOB Australia,2025-07-09,2025-07-31,Started,"Product: MYOB Implementation
+Owner: Jayshil
+Action Items: Customer to get back on implementation.
+Project is fully paid.
+Issues: CUSTOMER DELAY
+Progress: 5%
+Total Billing: $4,947
+Total Billed: $4,947",,1
+7,MY Transport,MY Transport,MYOB,MYOB Australia,2025-07-09,2025-07-31,In Progress,"Product: MYOB Implementation
+Owner: Jayshil
+Action Items: Forms customization – form 1 completed.
+Waiting for the second login to customize the final form. (awaiting customer)
+Check On Sign-Off
+Progress: 70%
+Total Billing: $9,112
+Total Billed: $9,112",,1
+6,LTA,LTA,LTA Report,Custom Development,2025-07-09,2025-07-15,In Progress,"Product: LTA Report
+Owner: Jayshil
+Action Items: Get AP Sign off
+XL Connect report development – WIP
+Configure payroll journal -WIP.",,1
+5,Douglas Salvage and Towage (Solomon Islands),Douglas Salvage and Towage (Solomon Islands),MYOB,MYOB Australia,2025-07-09,2025-07-31,Started,"Product: MYOB Implementation
+Owner: Jayshil
+Action Items: Setup company file and later opening balance – WIP
+Details sent to customer to verify. (Awaiting response)
+Issues: CUSTOMER DELAY
+Progress: 20%
+Total Billing: $3,905
+Total Billed: $3,905",,1
+4,Pay Global,Pay Global,PayGlobal,PayGlobal Ltd,2025-07-09,2025-07-31,Started,"Product: Pay Global (On Prem)
+Owner: Jayshil
+Action Items: Create inhouse server – Completed.
+Download Fiji Setup files – Completed. 
+Install configuration file. Check with vendor.
+Progress: 20%",,1
+3,LTA Project,LTA,Epicor,Senthil,2022-07-01,2025-07-31,In Progress,Epicor Upgrade From E7 to Kinetic,uploaded_files/MOM LTA-(24062025).docx,1
