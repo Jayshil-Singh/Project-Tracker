@@ -248,123 +248,41 @@ st.markdown("""
 # --- Top Navbar ---
 def render_navbar(current_user):
     menu_options = [
-        ("🏠 Dashboard", "🏠 Dashboard"),
-        ("📁 Project Tracker", "📁 Project Tracker"),
-        ("🗓️ Meeting & MoM Log", "🗓️ Meeting & MoM Log"),
-        ("🧾 Client Update Log", "🧾 Client Update Log"),
-        ("🛠️ Issue Tracker", "🛠️ Issue Tracker"),
-        ("🤖 AI Chatbot", "🤖 AI Chatbot"),
-        ("📈 Analytics", "📈 Analytics"),
-        ("📧 Email Integration", "📧 Email Integration")
+        ("🏠 Dashboard", "Dashboard"),
+        ("📁 Project Tracker", "Project Tracker"),
+        ("🗓️ Meeting & MoM Log", "Meeting & MoM Log"),
+        ("🧾 Client Update Log", "Client Update Log"),
+        ("🛠️ Issue Tracker", "Issue Tracker"),
+        ("🤖 AI Chatbot", "AI Chatbot"),
+        ("📈 Analytics", "Analytics"),
+        ("📧 Email Integration", "Email Integration")
     ]
     if current_user['role'] == 'admin':
-        menu_options.append(("👥 User Management", "👥 User Management"))
-    active_menu = st.session_state.get('active_menu', menu_options[0][1])
-    st.markdown(f'''
-    <div class="navbar">
+        menu_options.append(("👥 User Management", "User Management"))
+    active_menu = st.query_params.get("nav", [menu_options[0][1]])[0]
+    st.session_state['active_menu'] = active_menu
+    navbar_html = '''<div class="navbar">
         <div class="navbar-logo">
             <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/Meetup_Logo.png" width="36" style="border-radius: 8px;">
             ProjectOps Assistant
         </div>
-        <div class="navbar-menu">
-            {''.join([
-                f'<a class="navbar-link{" active" if active_menu == opt[1] else ""}" href="#" onclick="window.parent.postMessage(\'setMenu::{opt[1]}\', \'*\')">{opt[0]}</a>'
-                for opt in menu_options
-            ])}
-        </div>
+        <div class="navbar-menu">'''
+    for icon, label in menu_options:
+        active_class = "active" if active_menu == label else ""
+        navbar_html += f'<a class="navbar-link {active_class}" href="?nav={label}">{icon} {label}</a>'
+    navbar_html += '''</div>
         <div class="profile-dropdown" tabindex="0">
-            <div class="profile-avatar">{current_user['full_name'][:2].upper()}</div>
+            <div class="profile-avatar">''' + current_user['full_name'][:2].upper() + '''</div>
             <div class="dropdown-content">
-                <div class="dropdown-item" onclick="window.parent.postMessage('editProfile', '*')">Edit Profile</div>
-                <div class="dropdown-item" onclick="window.parent.postMessage('logout', '*')">Logout</div>
+                <div class="dropdown-item" onclick="window.location.href='?nav=profile'">Edit Profile</div>
+                <div class="dropdown-item" onclick="window.location.href='?nav=logout'">Logout</div>
             </div>
         </div>
-    </div>
-    ''', unsafe_allow_html=True)
+    </div>'''
+    st.markdown(navbar_html, unsafe_allow_html=True)
 
-    # JS to handle menu/profile actions
-    st.markdown('''
-    <script>
-    window.addEventListener('message', function(event) {
-        if (typeof event.data === 'string') {
-            if (event.data.startsWith('setMenu::')) {
-                const menu = event.data.replace('setMenu::', '');
-                window.parent.postMessage('setMenuInternal::' + menu, '*');
-            } else if (event.data === 'editProfile') {
-                window.parent.postMessage('showProfilePage', '*');
-            } else if (event.data === 'logout') {
-                window.parent.postMessage('logoutUser', '*');
-            }
-        }
-    });
-    </script>
-    ''', unsafe_allow_html=True)
-
-# --- JS event handler in Streamlit ---
-def handle_navbar_events():
-    import streamlit.components.v1 as components
-    components.html('''
-    <script>
-    window.addEventListener('message', function(event) {
-        if (typeof event.data === 'string') {
-            if (event.data.startsWith('setMenuInternal::')) {
-                const menu = event.data.replace('setMenuInternal::', '');
-                window.parent.postMessage('setMenuConfirmed::' + menu, '*');
-                window.location.hash = menu;
-            } else if (event.data === 'showProfilePage') {
-                window.parent.postMessage('showProfilePageConfirmed', '*');
-                window.location.hash = 'profile';
-            } else if (event.data === 'logoutUser') {
-                window.parent.postMessage('logoutUserConfirmed', '*');
-                window.location.hash = 'logout';
-            }
-        }
-    });
-    </script>
-    ''', height=0)
-
-# --- Remove sidebar branding and project options ---
-# Only keep user info/profile picture if needed
-with st.sidebar:
-    # Only show user info/profile picture
-    st.markdown("### 👤 User Profile")
-    if 'profile_picture' not in st.session_state:
-        st.session_state['profile_picture'] = None
-    if st.session_state['profile_picture'] is not None:
-        st.image(st.session_state['profile_picture'], width=60, use_column_width=True)
-    else:
-        st.markdown(f"<div style='width: 60px; height: 60px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; font-weight: bold;'>{current_user['full_name'][:2].upper()}</div>", unsafe_allow_html=True)
-    st.markdown(f"**{current_user['full_name']}**")
-    st.markdown(f"*{current_user['email']}*")
-    st.markdown(f"**Role:** {current_user['role'].title()}")
-    uploaded_file = st.file_uploader("Upload Profile Picture", type=['png', 'jpg', 'jpeg'], key="profile_upload", help="Upload a profile picture (PNG, JPG, JPEG)")
-    if uploaded_file is not None:
-        st.session_state['profile_picture'] = uploaded_file
-        st.success("✅ Profile picture updated!")
-        st.rerun()
-    if st.button("🖼️ Change Picture", key="change_picture_btn", use_container_width=True):
-        st.session_state['show_profile_page'] = True
-        st.rerun()
-    if st.session_state['profile_picture'] is not None:
-        if st.button("🗑️ Remove Picture", key="remove_profile_pic", use_container_width=True):
-            st.session_state['profile_picture'] = None
-            st.success("✅ Profile picture removed!")
-            st.rerun()
-
-# --- Render the navbar and handle events ---
-render_navbar(current_user)
-handle_navbar_events()
-
-# --- Navigation logic based on hash or session state ---
-import streamlit as st
-import re
-hash_val = st.query_params.get('nav', [None])[0]
-if not hash_val:
-    hash_val = re.sub(r'^#', '', st.query_params.get('nav', [None])[0] or '')
-if not hash_val:
-    hash_val = st.session_state.get('active_menu', '🏠 Dashboard')
-if hash_val:
-    st.session_state['active_menu'] = hash_val
+# Remove JS postMessage logic and event handler
+# --- Navigation logic based on query param ---
 menu = st.session_state['active_menu']
 
 # --- Main content rendering (unchanged) ---
