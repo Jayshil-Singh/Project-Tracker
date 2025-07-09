@@ -748,12 +748,12 @@ if current_user:
                                     <span>📝 <b>{len(db.get_client_updates_by_project(pid, current_user['id']))}</b> Updates</span>
                                     <span>🐞 <b>{len(issues[issues['project_id'] == pid]) if not issues.empty else 0}</b> Issues</span>
                                 </div>
-                                {st.page_link(
-                                    "pages/ProjectDetails.py",
-                                    label="🔍 View Details",
-                                    params={"project_id": pid},
-                                    use_container_width=True
-                                )}
+                                {st.markdown(
+    f'<a href="/ProjectDetails?project_id={pid}">'
+    '<button class="project-details-btn">🔍 View Details</button>'
+    '</a>',
+    unsafe_allow_html=True
+)}
                             </div>
                             ''', unsafe_allow_html=True)
                         
