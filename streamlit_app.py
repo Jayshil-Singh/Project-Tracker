@@ -149,6 +149,7 @@ current_user = check_authentication()
 
 # After current_user is set (after authentication):
 profile_pic_path = db.get_user_profile_picture(current_user['id'])
+st.write("Fetched profile picture path from DB:", profile_pic_path)
 if profile_pic_path and os.path.exists(os.path.abspath(profile_pic_path)):
     st.session_state['profile_picture'] = profile_pic_path
 else:
