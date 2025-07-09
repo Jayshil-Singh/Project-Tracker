@@ -187,6 +187,8 @@ if current_user:
         
         with col1:
             # Display profile picture or default avatar
+            st.write("Profile picture path:", st.session_state['profile_picture'])
+            st.write("File exists:", os.path.exists(st.session_state['profile_picture']) if st.session_state['profile_picture'] else False)
             if st.session_state['profile_picture'] is not None and os.path.exists(st.session_state['profile_picture']):
                 st.image(st.session_state['profile_picture'], width=60, use_column_width=True)
             else:
