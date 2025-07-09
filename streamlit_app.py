@@ -432,6 +432,10 @@ if menu == "👥 User Management" and current_user['role'] == 'admin':
     st.stop()
 
 # Main content area
+st.write("DEBUG: menu =", menu)
+
+# --- Main content rendering (unchanged) ---
+# Profile Picture Management Page
 if menu == "🏠 Dashboard":
     st.markdown('<h1 class="main-header">ProjectOps Assistant Dashboard</h1>', unsafe_allow_html=True)
     
