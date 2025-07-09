@@ -220,7 +220,8 @@ with st.sidebar:
 # Map hash to menu
 hash_to_menu = {k: v for v, k in menu_options}
 if 'active_menu' in st.session_state:
-    hash_val = st.experimental_get_query_params().get('hash', [None])[0]
+    # Use st.query_params instead of deprecated st.experimental_get_query_params
+    hash_val = st.query_params.get('hash', [None])[0] if hasattr(st, 'query_params') else None
     if hash_val and hash_val in hash_to_menu:
         st.session_state['active_menu'] = hash_val
     menu = [label for label, key in menu_options if key == st.session_state['active_menu']][0]
