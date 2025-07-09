@@ -117,16 +117,97 @@ def check_authentication():
 # Get current user
 current_user = check_authentication()
 
-# User info in sidebar
+# --- Sidebar Branding and Navigation ---
 with st.sidebar:
+    # Branding/logo (replace with your logo path if available)
+    st.markdown("""
+    <div style='text-align: center; margin-bottom: 1.5rem;'>
+        <img src='https://upload.wikimedia.org/wikipedia/commons/6/6b/Meetup_Logo.png' width='80' style='border-radius: 12px; margin-bottom: 0.5rem;'>
+        <div style='font-size: 1.3rem; font-weight: bold; color: #1f77b4;'>ProjectOps Assistant</div>
+        <div style='font-size: 0.95rem; color: #888;'>Business Project Tracker</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
     st.markdown("### 👤 User Info")
     st.markdown(f"**Name:** {current_user['full_name']}")
     st.markdown(f"**Email:** {current_user['email']}")
     st.markdown(f"**Role:** {current_user['role'].title()}")
-    
     st.markdown("---")
-    
-    # Logout button
+
+    # Professional sidebar menu
+    menu_options = [
+        ("🏠 Dashboard", "dashboard"),
+        ("📁 Project Tracker", "projects"),
+        ("🗓️ Meeting & MoM Log", "meetings"),
+        ("🧾 Client Update Log", "updates"),
+        ("🛠️ Issue Tracker", "issues"),
+        ("🤖 AI Chatbot", "chatbot"),
+        ("📈 Analytics", "analytics"),
+        ("📧 Email Integration", "email")
+    ]
+    if current_user['role'] == 'admin':
+        menu_options.append(("👥 User Management", "users"))
+
+    # Use session state for navigation
+    if 'active_menu' not in st.session_state:
+        st.session_state['active_menu'] = menu_options[0][1]
+
+    def set_active_menu(menu_key):
+        st.session_state['active_menu'] = menu_key
+
+    st.markdown("""
+    <style>
+    .sidebar-menu-item {
+        padding: 0.7rem 1rem 0.7rem 0.7rem;
+        border-radius: 8px;
+        margin-bottom: 0.3rem;
+        font-size: 1.08rem;
+        font-weight: 500;
+        color: #222;
+        cursor: pointer;
+        transition: background 0.15s;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+    }
+    .sidebar-menu-item.active {
+        background: linear-gradient(90deg, #1f77b4 60%, #764ba2 100%);
+        color: #fff !important;
+        font-weight: bold;
+    }
+    .sidebar-menu-item:hover {
+        background: #f0f4fa;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    for label, key in menu_options:
+        active = st.session_state['active_menu'] == key
+        menu_html = f"""
+        <div class='sidebar-menu-item{' active' if active else ''}' onclick="window.location.hash='{key}'">
+            {label}
+        </div>
+        """
+        st.markdown(menu_html, unsafe_allow_html=True)
+        if st.session_state['active_menu'] == key:
+            menu = label
+
+    # JS to update session state on click (Streamlit limitation workaround)
+    st.markdown("""
+    <script>
+    const items = window.parent.document.querySelectorAll('.sidebar-menu-item');
+    items.forEach(item => {
+        item.onclick = function() {
+            const hash = this.getAttribute('onclick').split("'")[1];
+            window.parent.location.hash = hash;
+            window.parent.location.reload();
+        }
+    });
+    </script>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
     if st.button("🚪 Logout", key="logout_btn", use_container_width=True):
         if 'session_token' in st.session_state:
             auth.logout_user(st.session_state.session_token)
@@ -134,20 +215,16 @@ with st.sidebar:
             del st.session_state.user_info
         st.success("✅ Logged out successfully!")
         st.rerun()
-    
     st.markdown("---")
 
-# Main navigation
-menu_options = [
-    "🏠 Dashboard", "📁 Project Tracker", "🗓️ Meeting & MoM Log", "🧾 Client Update Log", "🛠️ Issue Tracker", "🤖 AI Chatbot", "📈 Analytics", "📧 Email Integration"
-]
-if current_user['role'] == 'admin':
-    menu_options.append("👥 User Management")
-menu = st.sidebar.selectbox(
-    "Navigation",
-    menu_options,
-    key="main_navigation"
-)
+# Map hash to menu
+hash_to_menu = {k: v for v, k in menu_options}
+if 'active_menu' in st.session_state:
+    hash_val = st.experimental_get_query_params().get('hash', [None])[0]
+    if hash_val and hash_val in hash_to_menu:
+        st.session_state['active_menu'] = hash_val
+    menu = [label for label, key in menu_options if key == st.session_state['active_menu']][0]
+
 
 # Admin-only User Management
 if menu == "👥 User Management" and current_user['role'] == 'admin':
@@ -432,6 +509,9 @@ elif menu == "📁 Project Tracker":
                 ]
             st.subheader(f"📋 Projects ({len(filtered_projects)} found)")
             seen_ids = set()
+            # --- CARD VIEW START ---
+            card_cols = st.columns(2)
+            card_count = 0
             for idx, project in filtered_projects.iterrows():
                 pname = project.get('project_name')
                 pid = project.get('id')
@@ -445,21 +525,48 @@ elif menu == "📁 Project Tracker":
                     pid not in seen_ids
                 ):
                     seen_ids.add(pid)
-                    with st.expander(f"📄 View Details - {pname} (ID: {pid})"):
-                        st.markdown(f"**Description:** {project['description']}")
-                        if project['file_path']:
-                            st.markdown(f"**File:** {project['file_path']}")
-                        col1d, col2d, col3d = st.columns(3)
-                        with col1d:
-                            project_meetings = meetings[meetings['project_id'] == project['id']] if not meetings.empty else pd.DataFrame()
-                            st.markdown(f"**Meetings:** {len(project_meetings)}")
-                        with col2d:
-                            project_updates = db.get_client_updates_by_project(project['id'], current_user['id'])
-                            st.markdown(f"**Updates:** {len(project_updates)}")
-                        with col3d:
-                            project_issues = issues[issues['project_id'] == project['id']] if not issues.empty else pd.DataFrame()
-                            st.markdown(f"**Issues:** {len(project_issues)}")
-                st.divider()
+                    col = card_cols[card_count % 2]
+                    with col:
+                        # Card styling
+                        status = project.get('status', 'In Progress')
+                        status_color = {
+                            'Completed': '#4CAF50',
+                            'In Progress': '#2196F3',
+                            'Pending': '#FFC107',
+                            'On Hold': '#FF5722',
+                            'Near Completion': '#00BCD4',
+                        }.get(status, '#607D8B')
+                        percent = project.get('percent_complete', '')
+                        if percent and isinstance(percent, str) and '%' in percent:
+                            percent_val = percent
+                        else:
+                            percent_val = ''
+                        # Card HTML
+                        st.markdown(f'''
+                        <div style="background: #fff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 1.5rem 1.2rem 1.2rem 1.2rem; margin-bottom: 1.5rem; border-left: 8px solid {status_color};">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <div style="font-size: 1.2rem; font-weight: bold; color: #222;">{pname}</div>
+                                <div style="font-size: 1rem; font-weight: 600; color: {status_color};">{status}</div>
+                            </div>
+                            <div style="margin: 0.5rem 0 0.7rem 0; color: #555; font-size: 0.98rem;">
+                                <b>Software:</b> {project.get('software', '')} <br>
+                                <b>Client:</b> {project.get('client_name', '')} <br>
+                                <b>Vendor:</b> {project.get('vendor', '')} <br>
+                                <b>Deadline:</b> {project.get('deadline', '')} <br>
+                                <b>Progress:</b> {percent_val}
+                            </div>
+                            <div style="margin-bottom: 0.5rem; color: #444; font-size: 0.97rem;">
+                                <b>Description:</b> {project.get('description', '')[:180]}{'...' if len(str(project.get('description', ''))) > 180 else ''}
+                            </div>
+                            <div style="display: flex; gap: 1.5rem; font-size: 0.97rem;">
+                                <span>📅 Meetings: <b>{len(meetings[meetings['project_id'] == pid]) if not meetings.empty else 0}</b></span>
+                                <span>📝 Updates: <b>{len(db.get_client_updates_by_project(pid, current_user['id']))}</b></span>
+                                <span>🐞 Issues: <b>{len(issues[issues['project_id'] == pid]) if not issues.empty else 0}</b></span>
+                            </div>
+                        </div>
+                        ''', unsafe_allow_html=True)
+                    card_count += 1
+            # --- CARD VIEW END ---
             col1e, col2e = st.columns(2)
             with col1e:
                 if st.button("📊 Export to PDF", key="projects_export_pdf", use_container_width=True):
