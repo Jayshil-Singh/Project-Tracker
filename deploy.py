@@ -16,7 +16,7 @@ def print_banner():
     banner = """
     ╔══════════════════════════════════════════════════════════════╗
     ║                                                              ║
-    ║              🚀 ProjectOps Assistant v2.0.0                 ║
+    ║              🚀ProjectOps Assistant v2.0.0                  ║
     ║                                                              ║
     ║         Enterprise Project Management System                 ║
     ║                                                              ║

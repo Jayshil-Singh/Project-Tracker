@@ -147,6 +147,13 @@ def check_authentication():
 # Get current user
 current_user = check_authentication()
 
+# After current_user is set (after authentication):
+profile_pic_path = db.get_user_profile_picture(current_user['id'])
+if profile_pic_path and os.path.exists(profile_pic_path):
+    st.session_state['profile_picture'] = profile_pic_path
+else:
+    st.session_state['profile_picture'] = None
+
 # Only show sidebar and main content for authenticated users
 if current_user:
     # Expand sidebar for authenticated users
@@ -180,7 +187,7 @@ if current_user:
         
         with col1:
             # Display profile picture or default avatar
-            if st.session_state['profile_picture'] is not None:
+            if st.session_state['profile_picture'] is not None and os.path.exists(st.session_state['profile_picture']):
                 st.image(st.session_state['profile_picture'], width=60, use_column_width=True)
             else:
                 # Default avatar
@@ -205,8 +212,12 @@ if current_user:
         # )
         
         # if uploaded_file is not None:
-        #     # Store the uploaded image in session state
-        #     st.session_state['profile_picture'] = uploaded_file
+        #     # Save the file to disk
+        #     file_ext = os.path.splitext(uploaded_file.name)[1]
+        #     file_path = os.path.join(PROFILE_PIC_DIR, f"{current_user['id']}{file_ext}")
+        #     with open(file_path, "wb") as f:
+        #         f.write(uploaded_file.getbuffer())
+        #     st.session_state['profile_picture'] = file_path
         #     st.success("✅ Profile picture updated!")
         #     st.rerun()
         

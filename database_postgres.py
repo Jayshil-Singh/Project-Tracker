@@ -411,3 +411,20 @@ class ProjectOpsDatabase:
         except Exception as e:
             st.error(f"Error getting project summary: {e}")
             return None 
+
+    def update_user_profile_picture(self, user_id, file_path):
+        with self.engine.connect() as conn:
+            conn.execute(
+                text("UPDATE users SET profile_picture = :file_path WHERE id = :user_id"),
+                {"file_path": file_path, "user_id": user_id}
+            )
+            conn.commit()
+
+    def get_user_profile_picture(self, user_id):
+        with self.engine.connect() as conn:
+            result = conn.execute(
+                text("SELECT profile_picture FROM users WHERE id = :user_id"),
+                {"user_id": user_id}
+            )
+            row = result.fetchone()
+            return row[0] if row and row[0] else None 
