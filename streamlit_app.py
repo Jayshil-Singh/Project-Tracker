@@ -92,35 +92,20 @@ st.markdown("""
     .project-card {
         background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
         border-radius: 16px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.12);
         padding: 1.8rem;
         margin-bottom: 1.8rem;
-        border-left: 6px solid VAR_STATUS_COLOR;
-        transition: transform 0.18s, box-shadow 0.18s;
+        border-left: 6px solid #2196F3;
         position: relative;
     }
-    .project-card:hover {
-        transform: translateY(-6px) scale(1.02);
-        box-shadow: 0 8px 24px rgba(31,119,180,0.18);
-        border-left: 6px solid #1f77b4;
-    }
-    .project-details-btn {
-        width: 100%;
-        padding: 0.7rem 0.5rem;
-        margin-top: 0.5rem;
-        background: linear-gradient(90deg,#1f77b4 0%,#764ba2 100%);
-        color: white;
-        font-weight: bold;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        font-size: 1rem;
-        transition: background 0.18s;
-    }
-    .project-details-btn:hover {
-        background: linear-gradient(90deg,#764ba2 0%,#1f77b4 100%);
-    }
 </style>
+""", unsafe_allow_html=True)
+
+# Remove Streamlit's default page navigation if present
+st.markdown("""
+    <style>
+    [data-testid="stSidebarNav"] {display: none;}
+    </style>
 """, unsafe_allow_html=True)
 
 # Authentication check
@@ -149,7 +134,6 @@ current_user = check_authentication()
 
 # After current_user is set (after authentication):
 profile_pic_path = db.get_user_profile_picture(current_user['id'])
-st.write("Fetched profile picture path from DB:", profile_pic_path)
 if profile_pic_path and os.path.exists(os.path.abspath(profile_pic_path)):
     st.session_state['profile_picture'] = profile_pic_path
 else:
@@ -188,10 +172,8 @@ if current_user:
         
         with col1:
             # Display profile picture or default avatar
-            st.write("Profile picture path:", st.session_state['profile_picture'])
-            st.write("File exists:", os.path.exists(st.session_state['profile_picture']) if st.session_state['profile_picture'] else False)
             if st.session_state['profile_picture'] and os.path.exists(os.path.abspath(st.session_state['profile_picture'])):
-                st.image(st.session_state['profile_picture'], width=60, use_column_width=True)
+                st.image(st.session_state['profile_picture'], width=60, use_container_width=True)
             else:
                 # Default avatar
                 st.markdown("""
@@ -229,12 +211,12 @@ if current_user:
             st.session_state['show_profile_page'] = True
             st.rerun()
         
-        # Remove profile picture button
-        if st.session_state['profile_picture'] is not None:
-            if st.button("🗑️ Remove Picture", key="remove_profile_pic", use_container_width=True):
-                st.session_state['profile_picture'] = None
-                st.success("✅ Profile picture removed!")
-                st.rerun()
+        # # Remove profile picture button
+        # if st.session_state['profile_picture'] is not None:
+        #     if st.button("🗑️ Remove Picture", key="remove_profile_pic", use_container_width=True):
+        #         st.session_state['profile_picture'] = None
+        #         st.success("✅ Profile picture removed!")
+        #         st.rerun()
         
         st.markdown("---")
 
@@ -337,7 +319,7 @@ if current_user:
         with col1:
             st.markdown("### Current Picture")
             if st.session_state['profile_picture'] is not None:
-                st.image(st.session_state['profile_picture'], width=200, use_column_width=True)
+                st.image(st.session_state['profile_picture'], width=200, use_container_width=True)
             else:
                 st.markdown("""
                 <div style='width: 200px; height: 200px; border-radius: 50%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
@@ -357,10 +339,34 @@ if current_user:
                 help="Upload a profile picture (PNG, JPG, JPEG)"
             )
             
-            if new_upload is not None:
-                st.session_state['profile_picture'] = new_upload
-                st.success("✅ Profile picture updated successfully!")
-                st.rerun()
+            # --- Prevent upload loop with session state flag ---
+            if 'profile_upload_done' not in st.session_state:
+                st.session_state['profile_upload_done'] = False
+
+            if new_upload is not None and not st.session_state['profile_upload_done']:
+                # Save the file to disk
+                import os
+                file_ext = os.path.splitext(new_upload.name)[1]
+                file_path = os.path.join("profile_pics", f"{current_user['id']}{file_ext}")
+                os.makedirs("profile_pics", exist_ok=True)
+                try:
+                    with open(file_path, "wb") as f:
+                        f.write(new_upload.getbuffer())
+                    # Try to update the DB
+                    try:
+                        db.update_user_profile_picture(current_user['id'], file_path)
+                        st.session_state['profile_picture'] = file_path
+                        st.session_state['profile_upload_done'] = True  # Prevent re-upload on rerun
+                        st.success("✅ Profile picture updated successfully!")
+                        st.rerun()
+                    except Exception as db_exc:
+                        st.error(f"❌ Failed to update profile picture in database: {db_exc}")
+                except Exception as file_exc:
+                    st.error(f"❌ Failed to save profile picture: {file_exc}")
+
+            # Reset the flag when the uploader is empty
+            if new_upload is None and st.session_state.get('profile_upload_done', False):
+                st.session_state['profile_upload_done'] = False
             
             st.markdown("---")
             
@@ -741,35 +747,61 @@ if current_user:
                                 percent_val = ''
                             
                             # Enhanced card HTML with better spacing and icons
-                            st.markdown(f'''
-                            <div class="project-card" style="border-left: 6px solid {status_color};">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;">
-                                    <div style="font-size: 1.3rem; font-weight: bold; color: #1a1a1a;">{pname}</div>
-                                    <div style="font-size: 0.9rem; font-weight: 600; color: {status_color}; background: {status_color}15; padding: 0.3rem 0.8rem; border-radius: 20px;">{status}</div>
+                            st.markdown(
+                                f"""
+                                <div style='background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%); border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 1.8rem; margin-bottom: 1.8rem; border-left: 6px solid {status_color}; position: relative;'>
+                                    <div style='display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;'>
+                                        <div style='font-size: 1.3rem; font-weight: bold; color: #1a1a1a;'>{pname}</div>
+                                        <div style='font-size: 0.9rem; font-weight: 600; color: {status_color}; background: {status_color}15; padding: 0.3rem 0.8rem; border-radius: 20px;'>{status}</div>
+                                    </div>
+                                    <div style='margin-bottom: 1rem; color: #555; font-size: 0.95rem; line-height: 1.5;'>
+                                        <div style='margin-bottom: 0.5rem;'><b>🖥️ Software:</b> {project.get('software', '')}</div>
+                                        <div style='margin-bottom: 0.5rem;'><b>👥 Client:</b> {project.get('client_name', '')}</div>
+                                        <div style='margin-bottom: 0.5rem;'><b>🏢 Vendor:</b> {project.get('vendor', '')}</div>
+                                        <div style='margin-bottom: 0.5rem;'><b>📅 Deadline:</b> {project.get('deadline', '')}</div>
+                                        <div style='margin-bottom: 0.5rem;'><b>📊 Progress:</b> {percent_val if percent_val else 'Not specified'}</div>
+                                    </div>
+                                    <div style='margin-bottom: 1rem; color: #444; font-size: 0.9rem; line-height: 1.4; background: #f8f9fa; padding: 0.8rem; border-radius: 8px;'>
+                                        <b>📝 Description:</b> {project.get('description', '')[:150]}{'...' if len(str(project.get('description', ''))) > 150 else ''}
+                                    </div>
+                                    <div style='display: flex; gap: 1.2rem; font-size: 0.9rem; color: #666; margin-bottom: 1rem;'>
+                                        <span>📅 <b>{len(meetings[meetings['project_id'] == pid]) if not meetings.empty else 0}</b> Meetings</span>
+                                        <span>📝 <b>{len(db.get_client_updates_by_project(pid, current_user['id']))}</b> Updates</span>
+                                        <span>🐞 <b>{len(issues[issues['project_id'] == pid]) if not issues.empty else 0}</b> Issues</span>
+                                    </div>
                                 </div>
-                                <div style="margin-bottom: 1rem; color: #555; font-size: 0.95rem; line-height: 1.5;">
-                                    <div style="margin-bottom: 0.5rem;"><b>🖥️ Software:</b> {project.get('software', '')}</div>
-                                    <div style="margin-bottom: 0.5rem;"><b>👥 Client:</b> {project.get('client_name', '')}</div>
-                                    <div style="margin-bottom: 0.5rem;"><b>🏢 Vendor:</b> {project.get('vendor', '')}</div>
-                                    <div style="margin-bottom: 0.5rem;"><b>📅 Deadline:</b> {project.get('deadline', '')}</div>
-                                    <div style="margin-bottom: 0.5rem;"><b>📊 Progress:</b> {percent_val if percent_val else 'Not specified'}</div>
-                                </div>
-                                <div style="margin-bottom: 1rem; color: #444; font-size: 0.9rem; line-height: 1.4; background: #f8f9fa; padding: 0.8rem; border-radius: 8px;">
-                                    <b>📝 Description:</b> {project.get('description', '')[:150]}{'...' if len(str(project.get('description', ''))) > 150 else ''}
-                                </div>
-                                <div style="display: flex; gap: 1.2rem; font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                                    <span>📅 <b>{len(meetings[meetings['project_id'] == pid]) if not meetings.empty else 0}</b> Meetings</span>
-                                    <span>📝 <b>{len(db.get_client_updates_by_project(pid, current_user['id']))}</b> Updates</span>
-                                    <span>🐞 <b>{len(issues[issues['project_id'] == pid]) if not issues.empty else 0}</b> Issues</span>
-                                </div>
-                                {st.markdown(
-    f'<a href="/ProjectDetails?project_id={pid}">'
-    '<button class="project-details-btn">🔍 View Details</button>'
-    '</a>',
-    unsafe_allow_html=True
-)}
-                            </div>
-                            ''', unsafe_allow_html=True)
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            st.markdown("<div style='height: 0.5rem'></div>", unsafe_allow_html=True)  # small spacer
+                            if st.button("🔍 View More", key=f"view_more_{pid}"):
+                                st.session_state['show_project_detail'] = True
+                                st.session_state['selected_project_id'] = pid
+                                st.rerun()
+                            # Style the button to look like part of the card
+                            st.markdown(
+                                f"""
+                                <style>
+                                div[data-testid="stButton"][key="view_more_{pid}"] button {{
+                                    min-width: 180px;
+                                    font-size: 1.1rem;
+                                    padding: 0.8rem 2.2rem;
+                                    margin: 0 auto;
+                                    display: block;
+                                    background: linear-gradient(90deg,#1f77b4 0%,#764ba2 100%);
+                                    color: white;
+                                    font-weight: bold;
+                                    border: none;
+                                    border-radius: 8px;
+                                    transition: background 0.18s;
+                                }}
+                                div[data-testid="stButton"][key="view_more_{pid}"] button:hover {{
+                                    background: linear-gradient(90deg,#764ba2 0%,#1f77b4 100%);
+                                }}
+                                </style>
+                                """,
+                                unsafe_allow_html=True
+                            )
                         
                         card_count += 1
                 
@@ -1114,7 +1146,6 @@ if st.session_state.get('show_project_detail', False):
                 st.markdown(f"**Minutes of Meeting:**\n{meeting['mom']}")
                 st.markdown(f"**Next Steps:** {meeting['next_steps']}")
                 st.markdown(f"**Follow-up Date:** {meeting['follow_up_date']}")
-                # Edit/Delete buttons (future: implement edit logic)
                 colm1, colm2 = st.columns(2)
                 with colm1:
                     if st.button("✏️ Edit MoM", key=f"edit_mom_{meeting['id']}"):
@@ -1126,7 +1157,6 @@ if st.session_state.get('show_project_detail', False):
                         st.rerun()
     else:
         st.info("No meetings found for this project.")
-    # Add new meeting
     with st.expander("➕ Add New Meeting", expanded=False):
         with st.form(f"add_meeting_form_{pid}"):
             meeting_date = st.date_input("Meeting Date")
@@ -1151,7 +1181,6 @@ if st.session_state.get('show_project_detail', False):
                 st.markdown(f"**Mode:** {update['mode']}")
                 st.markdown(f"**Client Feedback:** {update['client_feedback']}")
                 st.markdown(f"**Next Step:** {update['next_step']}")
-                # Edit/Delete buttons (future: implement edit logic)
                 colu1, colu2 = st.columns(2)
                 with colu1:
                     if st.button("✏️ Edit Update", key=f"edit_update_{update['id']}"):
@@ -1163,7 +1192,6 @@ if st.session_state.get('show_project_detail', False):
                         st.rerun()
     else:
         st.info("No updates found for this project.")
-    # Add new update
     with st.expander("➕ Add New Update/Log", expanded=False):
         with st.form(f"add_update_form_{pid}"):
             update_date = st.date_input("Update Date")
@@ -1191,7 +1219,6 @@ if st.session_state.get('show_project_detail', False):
                 st.markdown(f"**Status:** {issue['status']}")
                 st.markdown(f"**Assigned To:** {issue['assigned_to']}")
                 st.markdown(f"**Resolution Date:** {issue['resolution_date']}")
-                # Edit/Delete buttons (future: implement edit logic)
                 coli1, coli2 = st.columns(2)
                 with coli1:
                     if st.button("✏️ Edit Issue", key=f"edit_issue_{issue['id']}"):
@@ -1203,7 +1230,6 @@ if st.session_state.get('show_project_detail', False):
                         st.rerun()
     else:
         st.info("No issues found for this project.")
-    # Add new issue
     with st.expander("➕ Add New Issue/Query", expanded=False):
         with st.form(f"add_issue_form_{pid}"):
             date_reported = st.date_input("Date Reported")
@@ -1219,8 +1245,8 @@ if st.session_state.get('show_project_detail', False):
     st.markdown("---")
     
     # Back button
-    if st.button("⬅️ Back to Project Tracker", key="back_to_tracker"):
+    if st.button("⬅️ Back to Project List", key="back_to_tracker"):
         st.session_state['show_project_detail'] = False
         st.session_state['selected_project_id'] = None
         st.rerun()
-    st.stop() 
+    st.stop()
